@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ._audio import play_pcm16, write_pcm16_to_wav
 from ._streaming import AgentEvent, AudioFrame
 
 if TYPE_CHECKING:
@@ -43,6 +45,28 @@ class Turn:
     transcript: str = ""
     tool_calls: list[tuple[str, str]] = field(default_factory=list)
     events: list[AgentEvent] = field(default_factory=list)
+
+    @property
+    def sample_rate(self) -> int:
+        return int((self.audio_meta or {}).get("sample_rate") or 24000)
+
+    @property
+    def channels(self) -> int:
+        return int((self.audio_meta or {}).get("channels") or 1)
+
+    def write_wav(self, path: str | Path) -> Path:
+        """Serialize the turn's audio to a WAV file. Sample rate +
+        channel count are taken from ``audio_meta`` (defaults to
+        24 kHz mono — what the agent pipeline always emits today).
+
+        Raises :class:`ValueError` if the turn has no audio."""
+        write_pcm16_to_wav(self.audio, path, sample_rate=self.sample_rate, channels=self.channels)
+        return Path(path)
+
+    def play(self, *, blocking: bool = True) -> None:
+        """Play the turn's audio through the default output device.
+        Requires ``pip install vocence[audio]``."""
+        play_pcm16(self.audio, sample_rate=self.sample_rate, channels=self.channels, blocking=blocking)
 
 
 class Conversation:
