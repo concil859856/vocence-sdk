@@ -5,7 +5,7 @@ the server adds new fields. New optional fields can be promoted to typed
 attributes in future SDK releases without breaking existing callers.
 """
 
-from .account import Account, ApiKey, ApiKeyCreated
+from .account import Account, ApiKey, ApiKeyCreated, UsageEntry
 from .agent import Agent, AgentBinding, AgentConfig, AgentSummary
 from .response import AudioResponse, CloneResponse, SttResponse, TtsResponse
 from .tool import CustomTool
@@ -26,5 +26,6 @@ __all__ = [
     "SavedVoice",
     "SttResponse",
     "TtsResponse",
+    "UsageEntry",
     "VoiceDesignPreview",
 ]

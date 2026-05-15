@@ -41,3 +41,19 @@ class ApiKeyCreated(_Base):
 
     key: ApiKey
     plain_key: str
+
+
+class UsageEntry(_Base):
+    """One row from ``GET /v1/account/usage`` — a past API call."""
+
+    id: str
+    endpoint: str
+    provider: str | None = None
+    status: str
+    http_status: int | None = None
+    credits_used: int = 0
+    request_chars: int | None = None
+    latency_ms: int | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+    created_at: str | None = None

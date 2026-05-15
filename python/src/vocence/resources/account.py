@@ -7,7 +7,7 @@ key is the only credential required — there's no separate login step.
 
 from __future__ import annotations
 
-from ..types import Account, ApiKey, ApiKeyCreated
+from ..types import Account, ApiKey, ApiKeyCreated, UsageEntry
 
 
 class _AccountBase:
@@ -61,6 +61,16 @@ class AccountResource(_AccountBase):
         data = self._http.request("GET", self._account_path)  # type: ignore[attr-defined]
         return Account.model_validate(data)
 
+    def usage(self, *, limit: int = 50) -> list[UsageEntry]:
+        """Recent API request log entries (any endpoint), newest first.
+        ``limit`` is capped at 200 server-side."""
+        data = self._http.request(  # type: ignore[attr-defined]
+            "GET",
+            f"{self._account_path}/usage",
+            params={"limit": limit},
+        )
+        return [UsageEntry.model_validate(r) for r in data.get("items", [])]
+
 
 class AsyncAccountResource(_AccountBase):
     def __init__(self, http: object) -> None:
@@ -70,3 +80,11 @@ class AsyncAccountResource(_AccountBase):
     async def get(self) -> Account:
         data = await self._http.request("GET", self._account_path)  # type: ignore[attr-defined]
         return Account.model_validate(data)
+
+    async def usage(self, *, limit: int = 50) -> list[UsageEntry]:
+        data = await self._http.request(  # type: ignore[attr-defined]
+            "GET",
+            f"{self._account_path}/usage",
+            params={"limit": limit},
+        )
+        return [UsageEntry.model_validate(r) for r in data.get("items", [])]
