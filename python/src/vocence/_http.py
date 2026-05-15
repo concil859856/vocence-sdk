@@ -196,7 +196,12 @@ class SyncHttp:
             else:
                 body = _parse_body(resp)
                 # Capture request_id from body or X-Request-ID header.
-                self.last_request_id = _extract_request_id(resp, body)
+                # Only OVERWRITE when we actually found a new id —
+                # responses without one (account / voices / agents)
+                # would otherwise clobber a useful previous value.
+                _rid = _extract_request_id(resp, body)
+                if _rid is not None:
+                    self.last_request_id = _rid
                 try:
                     _raise_for_status(resp, body)
                 except VocenceError as e:
