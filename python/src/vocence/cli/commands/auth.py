@@ -162,8 +162,12 @@ def _verify_and_save(key: str) -> None:
         raise typer.Exit(code=1) from None
 
     config.set_api_key(key)
+    # Show the friendly name/email when the server gave us one — humans
+    # remember "medfil / medfil@…" much more reliably than a 21-digit
+    # Google sub id. Fall back to the id only if both are missing.
+    who = acct.name or acct.email or acct.user_id
     typer.secho(
-        f"Logged in as {acct.user_id} · plan={acct.plan_code} · "
+        f"Logged in as {who} · plan={acct.plan_code} · "
         f"credits={acct.credits:,} · key saved to {config.CONFIG_FILE}",
         fg=typer.colors.GREEN,
     )

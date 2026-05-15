@@ -4,7 +4,6 @@ commands that exercise the most-used endpoints from the shell.
 
 from __future__ import annotations
 
-import urllib.request
 from pathlib import Path
 
 import typer
@@ -42,8 +41,12 @@ def speak(
     typer.echo(result.audio_url)
     if str(out) == "-":
         return
+    # Use the SDK's own download helper — it sends the canonical
+    # ``vocence-python/X.Y.Z`` User-Agent which the CDN allows. Raw
+    # urllib uses ``Python-urllib/3.x`` and Cloudflare's default WAF
+    # rules return 403 for that UA in front of audio.vocence.ai.
     try:
-        urllib.request.urlretrieve(result.audio_url, out)  # noqa: S310 — explicit, signed URL
+        result.write_wav(out, timeout=60.0)
     except Exception as e:
         typer.secho(f"Could not download to {out}: {e}", fg=typer.colors.YELLOW, err=True)
         return
