@@ -32,17 +32,58 @@ ENV_BASE_URL = "VOCENCE_BASE_URL"
 
 
 def _resolve_key(api_key: str | None) -> str:
-    key = (api_key or os.environ.get(ENV_API_KEY) or "").strip()
-    if not key:
-        raise ValueError(
-            "API key is required. Pass `api_key=...` or set the "
-            f"{ENV_API_KEY} environment variable."
-        )
-    return key
+    """Resolve an API key from (in order):
+
+      1. The explicit ``api_key=`` argument.
+      2. The ``VOCENCE_API_KEY`` env var.
+      3. The CLI config file (``~/.vocence/config.json``) — same place
+         ``vocence login`` writes to. If OS-keyring storage is enabled,
+         the key is read from there instead.
+
+    This third source means ``Vocence()`` from a Python REPL "just
+    works" after the user has run ``vocence login`` — no env-var
+    dance required.
+    """
+    if api_key and api_key.strip():
+        return api_key.strip()
+    env = os.environ.get(ENV_API_KEY)
+    if env and env.strip():
+        return env.strip()
+    # Fall back to the CLI's persisted store. Lazy-imported because the
+    # CLI subpackage pulls in Typer, which most Python integrators don't
+    # care about — we don't want to penalise their import time.
+    try:
+        from .cli.config import get_api_key  # noqa: PLC0415 — intentional lazy import
+        cli_key = get_api_key()
+    except Exception:
+        cli_key = None
+    if cli_key:
+        return cli_key
+    raise ValueError(
+        "API key is required. Pass `api_key=...`, set "
+        f"{ENV_API_KEY} in the environment, or run `vocence login`."
+    )
 
 
 def _resolve_base_url(base_url: str | None) -> str:
-    return (base_url or os.environ.get(ENV_BASE_URL) or DEFAULT_BASE_URL).rstrip("/")
+    """Resolve the base URL from (in order):
+
+      1. Explicit ``base_url=`` argument.
+      2. ``VOCENCE_BASE_URL`` env var.
+      3. CLI config (``vocence config set-base-url ...``).
+      4. The default ``https://api.vocence.ai``.
+    """
+    if base_url and base_url.strip():
+        return base_url.strip().rstrip("/")
+    env = os.environ.get(ENV_BASE_URL)
+    if env and env.strip():
+        return env.strip().rstrip("/")
+    try:
+        from .cli.config import get_base_url  # noqa: PLC0415
+        cli_url = get_base_url()
+    except Exception:
+        cli_url = None
+    return (cli_url or DEFAULT_BASE_URL).rstrip("/")
 
 
 class Vocence:
