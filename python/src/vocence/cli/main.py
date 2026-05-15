@@ -10,8 +10,12 @@ from __future__ import annotations
 import typer
 
 from .commands import account as account_cmds
+from .commands import agents as agents_cmds
 from .commands import auth as auth_cmds
+from .commands import chat as chat_cmds
+from .commands import clone as clone_cmds
 from .commands import config as config_cmds
+from .commands import design as design_cmds
 from .commands import keys as keys_cmds
 from .commands import usage as usage_cmds
 from .commands import voices as voices_cmds
@@ -30,12 +34,17 @@ app.command("login")(auth_cmds.login)
 app.add_typer(config_cmds.app, name="config", help="Inspect or update CLI configuration.")
 app.add_typer(keys_cmds.app, name="keys", help="Manage developer API keys.")
 app.add_typer(account_cmds.app, name="account", help="Show plan and credit balance.")
+app.add_typer(agents_cmds.app, name="agents", help="Manage your agents.")
 
 # Short utility commands.
 app.command("voices")(voices_cmds.voices)
 app.command("speak")(voices_cmds.speak)
 app.command("transcribe")(voices_cmds.transcribe)
 app.command("usage")(usage_cmds.usage)
+app.command("chat")(chat_cmds.chat)
+app.command("voice")(chat_cmds.voice)
+app.command("clone")(clone_cmds.clone)
+app.command("design")(design_cmds.design)
 
 
 if __name__ == "__main__":  # pragma: no cover
