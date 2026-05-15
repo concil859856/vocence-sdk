@@ -40,6 +40,11 @@ audio = [
     "sounddevice>=0.4",
     "numpy>=1.24",
 ]
+# Store the CLI's API key in the OS keychain (macOS Keychain, Windows
+# Credential Locker, freedesktop Secret Service) instead of a flat file.
+keyring = [
+    "keyring>=24",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",

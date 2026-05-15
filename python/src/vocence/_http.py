@@ -53,6 +53,23 @@ def _auth_header(api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {raw}"}
 
 
+def redact_key(value: str | None) -> str:
+    """Render an API key in ``voc_live_XXXX…XXXX`` form for safe display.
+
+    Use anywhere the SDK might print, log, or otherwise expose a key —
+    error messages, debug hooks, masked CLI output. Always shorten to a
+    fixed shape regardless of input length so the actual entropy never
+    appears in process listings, log files, or screenshots."""
+    if not value:
+        return "(unset)"
+    s = value.strip()
+    if s.lower().startswith("bearer "):
+        s = s[7:].strip()
+    if len(s) <= 12:
+        return "*" * len(s)
+    return f"{s[:12]}…{s[-4:]}"
+
+
 def _parse_body(resp: httpx.Response) -> Any:
     """Decode JSON if the upstream said so, else fall back to raw text."""
     ctype = (resp.headers.get("content-type") or "").lower()
@@ -141,6 +158,9 @@ class SyncHttp:
         self._retry_mutations = bool(retry_mutations_on_5xx)
         self.last_request_id: str | None = None
 
+    def __repr__(self) -> str:
+        return f"SyncHttp(base_url={self._base_url!r}, api_key={redact_key(self._api_key)!r})"
+
     def close(self) -> None:
         if self._owns_client:
             self._client.close()
@@ -220,6 +240,9 @@ class AsyncHttp:
         self._retry_max = retry_max_seconds
         self._retry_mutations = bool(retry_mutations_on_5xx)
         self.last_request_id: str | None = None
+
+    def __repr__(self) -> str:
+        return f"AsyncHttp(base_url={self._base_url!r}, api_key={redact_key(self._api_key)!r})"
 
     async def aclose(self) -> None:
         if self._owns_client:

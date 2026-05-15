@@ -100,6 +100,12 @@ class Vocence:
         Useful for support tickets — paste this when reporting a bug."""
         return self._http.last_request_id
 
+    def __repr__(self) -> str:
+        # Mask the key so the SDK can't leak secrets through stack
+        # traces, debug logs, or accidental ``print(client)`` calls.
+        from ._http import redact_key
+        return f"Vocence(base_url={self._base_url!r}, api_key={redact_key(self._http._api_key)!r})"
+
     def close(self) -> None:
         self._http.close()
 
@@ -157,6 +163,10 @@ class AsyncVocence:
     @property
     def last_request_id(self) -> str | None:
         return self._http.last_request_id
+
+    def __repr__(self) -> str:
+        from ._http import redact_key
+        return f"AsyncVocence(base_url={self._base_url!r}, api_key={redact_key(self._api_key)!r})"
 
     async def aclose(self) -> None:
         await self._http.aclose()
