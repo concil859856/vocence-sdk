@@ -167,7 +167,7 @@ class AsyncAgentsResource(_AgentsBase):
     def tools(self, agent_id: str) -> _AsyncAgentToolBindings:
         return _AsyncAgentToolBindings(self._http, agent_id)
 
-    def session(self, agent_id: str) -> "AgentSession":
+    def session(self, agent_id: str) -> AgentSession:
         """Open a real-time voice / text WebSocket session with an agent.
 
         Use as an async context manager::

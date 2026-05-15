@@ -4,7 +4,7 @@ upload-and-save variant ``POST /v1/voice/clone/save``."""
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, IO
+from typing import IO, Any
 
 from ..types import CloneResponse
 from .stt import _b64_audio

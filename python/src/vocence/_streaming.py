@@ -17,13 +17,20 @@ the connection or the iterator is cancelled.
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from ._errors import APIConnectionError, AuthenticationError, NotFoundError, UpstreamError, VocenceError
+from ._errors import (
+    APIConnectionError,
+    AuthenticationError,
+    NotFoundError,
+    UpstreamError,
+    VocenceError,
+)
 
 
 @dataclass
