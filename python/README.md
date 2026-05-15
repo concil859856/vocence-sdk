@@ -6,7 +6,8 @@
 Official Python client for the [Vocence](https://vocence.ai) Developer API.
 
 ```bash
-pip install vocence
+pip install vocence              # REST + WebSocket
+pip install "vocence[audio]"     # adds Turn.play() and the mic ↔ agent live-chat helper
 ```
 
 ## Quickstart
@@ -90,14 +91,21 @@ with Vocence(api_key="voc_live_...").agents.session("agent-id") as sess:
 
 ```bash
 $ vocence login                          # opens a browser → approve → key saved
-$ vocence login --paste                  # or paste a key you generated on the website
 $ vocence account                        # show plan, credits remaining, key count
 $ vocence usage                          # last 20 API requests
-$ vocence keys list
-$ vocence keys create --name "laptop"
+$ vocence keys list / create / revoke
+$ vocence agents list / show / create / delete
+
+# voices
 $ vocence voices                         # list built-in speakers
 $ vocence speak "Hello" --voice design-aria -o out.wav
+$ vocence clone path/to/clip.wav --name "My Voice"
+$ vocence design "warm female narrator"   # interactive design + save
+
+# audio
 $ vocence transcribe clip.wav --language English
+$ vocence chat <agent-id>                 # text REPL, plays the reply
+$ vocence voice <agent-id>                # push-to-talk mic REPL  (needs vocence[audio])
 ```
 
 Config is written to `~/.vocence/config.json`. Override the key with the

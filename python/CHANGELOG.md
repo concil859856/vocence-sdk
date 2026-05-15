@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-15
+
+### Added
+- **Automatic retries** with exponential backoff + jitter on 429 (honors
+  ``Retry-After``), transient 5xx (502/503/504), and network errors.
+  GETs always retry; mutating verbs (POST/PATCH/DELETE) opt-in via
+  ``Vocence(retry_mutations_on_5xx=True)``. Disable entirely with
+  ``max_retries=0``.
+- **``client.last_request_id``** — server-issued request id from the most
+  recent HTTP call, useful for support tickets.
+- **Optional ``[audio]`` extra** (``pip install vocence[audio]``) pulls
+  ``sounddevice`` + ``numpy``.
+- **``Turn.write_wav(path)``** — serialize a turn's audio to a proper
+  WAV file (no manual PCM-to-WAV header writing).
+- **``Turn.play()``** — play the assistant's reply through the default
+  output device.
+- **Live mic↔agent chat** — ``client.agents.live_chat(agent_id)`` opens
+  a push-to-talk WS session, ships base64-encoded audio, plays the reply
+  in real time as frames arrive.
+- **CLI: ``vocence chat <agent>``** — text REPL with the conversation
+  helper (plays audio if ``[audio]`` is installed).
+- **CLI: ``vocence voice <agent>``** — push-to-talk mic REPL.
+- **CLI: ``vocence agents list/show/create/delete``** — agent CRUD.
+- **CLI: ``vocence design "warm female narrator"``** — preview + interactive
+  variant picker + save.
+- **CLI: ``vocence clone <wav> --name "..."``** — one-shot upload + save.
+
 ## [0.2.0] — 2026-05-15
 
 ### Added
