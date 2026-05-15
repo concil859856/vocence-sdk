@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from ._audio_mixin import _AudioFetchMixin
+
 
 class _Base(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class TtsResponse(_Base):
+class TtsResponse(_Base, _AudioFetchMixin):
     """Shape returned by ``POST /v1/tts/generate`` and ``POST /v1/tts/speak``."""
 
     request_id: str
@@ -33,7 +35,7 @@ class SttResponse(_Base):
     credits_used: int
 
 
-class CloneResponse(_Base):
+class CloneResponse(_Base, _AudioFetchMixin):
     """Shape returned by ``POST /v1/voice/clone``."""
 
     request_id: str
@@ -46,7 +48,7 @@ class CloneResponse(_Base):
     credits_used: int
 
 
-class AudioResponse(_Base):
+class AudioResponse(_Base, _AudioFetchMixin):
     """Generic shape returned by saved-voice / sample-voice speak endpoints
     (``POST /v1/voices/{id}/speak``). The dashboard-backend's response is
     passed through verbatim — common keys are typed, anything extra is
