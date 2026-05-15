@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **security@vocence.ai** with the details. Please **do not** open a
+Email **space@vocence.ai** with the details. Please **do not** open a
 public GitHub issue for sensitive reports. We acknowledge within 2
 business days and aim to ship a fix within 14 days for medium / high
 severity.
@@ -63,7 +63,7 @@ Threat-by-threat:
   explicit security warning explaining that approval mints a new
   full-access key. We will not bypass this warning in v0 — if you have
   ideas for stronger out-of-band verification (e.g. push notification
-  to a logged-in mobile session), please email security@vocence.ai.
+  to a logged-in mobile session), please email space@vocence.ai.
 - **Attacker spams `/api/cli/device-code` to DoS the user_code namespace.**
   Per-IP rate limit (10 codes / minute) caps the abuse.
 - **Attacker intercepts the `device_code` on the wire.** Only feasible
@@ -92,7 +92,7 @@ If you suspect a key has been leaked:
 1. Run `vocence keys list` to find it.
 2. Run `vocence keys revoke <id>` immediately.
 3. `vocence keys create --name "rotated"` to issue a replacement.
-4. Email security@vocence.ai with the date/time + how it leaked so we
+4. Email space@vocence.ai with the date/time + how it leaked so we
    can correlate with our access logs.
 
 Revocation is immediate; the revoked key returns HTTP 403 on the next

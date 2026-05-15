@@ -9,7 +9,7 @@ description = "Official Python SDK for the Vocence Developer API — TTS, STT, v
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
-authors = [{ name = "Vocence", email = "support@vocence.ai" }]
+authors = [{ name = "Vocence", email = "space@vocence.ai" }]
 keywords = ["vocence", "tts", "stt", "voice-cloning", "voice-design", "bittensor"]
 classifiers = [
     "Development Status :: 4 - Beta",
