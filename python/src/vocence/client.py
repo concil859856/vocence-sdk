@@ -100,6 +100,19 @@ class Vocence:
         Useful for support tickets — paste this when reporting a bug."""
         return self._http.last_request_id
 
+    def health(self, *, timeout: float = 10.0) -> bool:
+        """Round-trip a tiny authenticated call; returns ``True`` iff the
+        API host is reachable AND the configured key is valid.
+
+        Use this before starting a long batch — it fails fast on a bad
+        key or an unreachable host. Charges nothing (``GET /v1/account``)."""
+        from ._errors import VocenceError
+        try:
+            self._http.request("GET", "/v1/account")
+            return True
+        except VocenceError:
+            return False
+
     def __repr__(self) -> str:
         # Mask the key so the SDK can't leak secrets through stack
         # traces, debug logs, or accidental ``print(client)`` calls.
@@ -163,6 +176,15 @@ class AsyncVocence:
     @property
     def last_request_id(self) -> str | None:
         return self._http.last_request_id
+
+    async def health(self, *, timeout: float = 10.0) -> bool:
+        """Async counterpart of :meth:`Vocence.health`."""
+        from ._errors import VocenceError
+        try:
+            await self._http.request("GET", "/v1/account")
+            return True
+        except VocenceError:
+            return False
 
     def __repr__(self) -> str:
         from ._http import redact_key
