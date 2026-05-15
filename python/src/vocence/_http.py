@@ -3,20 +3,44 @@
 Wraps ``httpx`` so the rest of the SDK only deals with parsed dicts and
 typed errors. Everything that can fail (network, decoding, non-2xx
 responses) is converted into a :class:`vocence.VocenceError` subclass.
+
+Retry behavior
+--------------
+GET requests + any request that returns 429 retry with exponential
+backoff + jitter. Other 4xx (auth, bad request) are NOT retried — those
+won't change. Mutating verbs (POST/PATCH/DELETE) are NOT retried by
+default on 5xx because re-sending could double-charge / double-create;
+callers can opt in via :class:`Vocence` constructor flags.
+
+We respect ``Retry-After`` on 429 responses; otherwise sleep grows as
+``base * 2**attempt`` with ±25% jitter, capped at ``max_wait``.
 """
 
 from __future__ import annotations
 
-from typing import Any, BinaryIO
+import asyncio
+import random
+import time
+from typing import Any, BinaryIO, Iterable
 
 import httpx
 
-from ._errors import APIConnectionError, VocenceError, error_for_status
+from ._errors import (
+    APIConnectionError,
+    RateLimitError,
+    UpstreamError,
+    VocenceError,
+    error_for_status,
+)
 from ._version import __version__
 
 DEFAULT_BASE_URL = "https://api.vocence.ai"
 DEFAULT_TIMEOUT = 120.0
 USER_AGENT = f"vocence-python/{__version__}"
+
+# 5xx codes that are typically transient — TTS provider hiccup, upstream
+# voice-clone server briefly down, dashboard restart. Worth retrying.
+_TRANSIENT_5XX: frozenset[int] = frozenset({502, 503, 504})
 
 
 def _auth_header(api_key: str) -> dict[str, str]:
@@ -64,6 +88,28 @@ def _raise_for_status(resp: httpx.Response, body: Any) -> None:
     )
 
 
+def _should_retry(method: str, exc: VocenceError, *, retry_mutations_on_5xx: bool) -> bool:
+    """Decide whether the failed request can safely be retried."""
+    if isinstance(exc, RateLimitError):
+        return True  # always retry rate limits, regardless of verb
+    if isinstance(exc, APIConnectionError):
+        return method == "GET" or retry_mutations_on_5xx
+    if isinstance(exc, UpstreamError) and exc.status_code in _TRANSIENT_5XX:
+        return method == "GET" or retry_mutations_on_5xx
+    return False
+
+
+def _backoff_sleep(attempt: int, *, base: float, max_wait: float, hint: float | None) -> float:
+    """Compute the sleep duration for ``attempt`` (0-indexed retry number).
+    Honors ``hint`` (Retry-After) when present, else exponential backoff
+    with ±25% jitter, capped at ``max_wait``."""
+    if hint is not None and hint >= 0:
+        return min(hint, max_wait)
+    raw = base * (2 ** attempt)
+    jitter = raw * 0.25 * (random.random() * 2 - 1)
+    return max(0.0, min(raw + jitter, max_wait))
+
+
 # --------------------------------------------------------------------- sync
 
 
@@ -75,6 +121,10 @@ class SyncHttp:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: httpx.Client | None = None,
+        max_retries: int = 2,
+        retry_base_seconds: float = 0.5,
+        retry_max_seconds: float = 8.0,
+        retry_mutations_on_5xx: bool = False,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -84,6 +134,11 @@ class SyncHttp:
             timeout=timeout,
             headers={"User-Agent": USER_AGENT, **_auth_header(api_key)},
         )
+        self._max_retries = max(0, int(max_retries))
+        self._retry_base = retry_base_seconds
+        self._retry_max = retry_max_seconds
+        self._retry_mutations = bool(retry_mutations_on_5xx)
+        self.last_request_id: str | None = None
 
     def close(self) -> None:
         if self._owns_client:
@@ -105,20 +160,34 @@ class SyncHttp:
         files: dict[str, tuple[str, BinaryIO | bytes, str]] | None = None,
         data: dict[str, Any] | None = None,
     ) -> Any:
-        try:
-            resp = self._client.request(
-                method,
-                path,
-                json=json,
-                params=params,
-                files=files,
-                data=data,
-            )
-        except httpx.HTTPError as e:
-            raise APIConnectionError(str(e)) from e
-        body = _parse_body(resp)
-        _raise_for_status(resp, body)
-        return body if isinstance(body, dict) else {"data": body}
+        last_exc: VocenceError | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                resp = self._client.request(
+                    method, path,
+                    json=json, params=params, files=files, data=data,
+                )
+            except httpx.HTTPError as e:
+                last_exc = APIConnectionError(str(e))
+            else:
+                body = _parse_body(resp)
+                # Capture request_id from body or X-Request-ID header.
+                self.last_request_id = _extract_request_id(resp, body)
+                try:
+                    _raise_for_status(resp, body)
+                except VocenceError as e:
+                    last_exc = e
+                else:
+                    return body if isinstance(body, dict) else {"data": body}
+            # Decide whether to retry.
+            assert last_exc is not None
+            if attempt >= self._max_retries:
+                raise last_exc
+            if not _should_retry(method.upper(), last_exc, retry_mutations_on_5xx=self._retry_mutations):
+                raise last_exc
+            hint = getattr(last_exc, "retry_after", None)
+            time.sleep(_backoff_sleep(attempt, base=self._retry_base, max_wait=self._retry_max, hint=hint))
+        raise last_exc  # unreachable but keeps the type-checker happy
 
 
 # --------------------------------------------------------------------- async
@@ -132,6 +201,10 @@ class AsyncHttp:
         base_url: str = DEFAULT_BASE_URL,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: httpx.AsyncClient | None = None,
+        max_retries: int = 2,
+        retry_base_seconds: float = 0.5,
+        retry_max_seconds: float = 8.0,
+        retry_mutations_on_5xx: bool = False,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -141,6 +214,11 @@ class AsyncHttp:
             timeout=timeout,
             headers={"User-Agent": USER_AGENT, **_auth_header(api_key)},
         )
+        self._max_retries = max(0, int(max_retries))
+        self._retry_base = retry_base_seconds
+        self._retry_max = retry_max_seconds
+        self._retry_mutations = bool(retry_mutations_on_5xx)
+        self.last_request_id: str | None = None
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -162,20 +240,46 @@ class AsyncHttp:
         files: dict[str, tuple[str, BinaryIO | bytes, str]] | None = None,
         data: dict[str, Any] | None = None,
     ) -> Any:
-        try:
-            resp = await self._client.request(
-                method,
-                path,
-                json=json,
-                params=params,
-                files=files,
-                data=data,
-            )
-        except httpx.HTTPError as e:
-            raise APIConnectionError(str(e)) from e
-        body = _parse_body(resp)
-        _raise_for_status(resp, body)
-        return body if isinstance(body, dict) else {"data": body}
+        last_exc: VocenceError | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                resp = await self._client.request(
+                    method, path,
+                    json=json, params=params, files=files, data=data,
+                )
+            except httpx.HTTPError as e:
+                last_exc = APIConnectionError(str(e))
+            else:
+                body = _parse_body(resp)
+                self.last_request_id = _extract_request_id(resp, body)
+                try:
+                    _raise_for_status(resp, body)
+                except VocenceError as e:
+                    last_exc = e
+                else:
+                    return body if isinstance(body, dict) else {"data": body}
+            assert last_exc is not None
+            if attempt >= self._max_retries:
+                raise last_exc
+            if not _should_retry(method.upper(), last_exc, retry_mutations_on_5xx=self._retry_mutations):
+                raise last_exc
+            hint = getattr(last_exc, "retry_after", None)
+            await asyncio.sleep(_backoff_sleep(attempt, base=self._retry_base, max_wait=self._retry_max, hint=hint))
+        raise last_exc
 
 
-__all__ = ["SyncHttp", "AsyncHttp", "DEFAULT_BASE_URL", "VocenceError"]
+# --------------------------------------------------------------------- helpers
+
+
+def _extract_request_id(resp: httpx.Response, body: Any) -> str | None:
+    """Prefer the server-issued ``request_id`` from the JSON body; fall
+    back to the ``X-Request-ID`` response header."""
+    if isinstance(body, dict):
+        rid = body.get("request_id")
+        if isinstance(rid, str) and rid:
+            return rid
+    hdr = resp.headers.get("x-request-id")
+    return hdr if hdr else None
+
+
+__all__: Iterable[str] = ["SyncHttp", "AsyncHttp", "DEFAULT_BASE_URL", "VocenceError"]

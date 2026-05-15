@@ -62,10 +62,28 @@ class Vocence:
         base_url: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: httpx.Client | None = None,
+        max_retries: int = 2,
+        retry_mutations_on_5xx: bool = False,
     ) -> None:
+        """Construct a sync client.
+
+        ``max_retries`` (default 2) controls auto-retry on 429 +
+        transient 5xx / network errors. Set to ``0`` to disable.
+
+        ``retry_mutations_on_5xx`` defaults to ``False`` — POST/PATCH/DELETE
+        are NOT retried on 5xx by default (could double-charge / double-create).
+        GET + 429 are always retried up to ``max_retries`` attempts.
+        """
         key = _resolve_key(api_key)
         self._base_url = _resolve_base_url(base_url)
-        self._http = SyncHttp(key, base_url=self._base_url, timeout=timeout, http_client=http_client)
+        self._http = SyncHttp(
+            key,
+            base_url=self._base_url,
+            timeout=timeout,
+            http_client=http_client,
+            max_retries=max_retries,
+            retry_mutations_on_5xx=retry_mutations_on_5xx,
+        )
 
         self.tts = TtsResource(self._http)
         self.stt = SttResource(self._http)
@@ -75,6 +93,12 @@ class Vocence:
         self.agent_tools = AgentToolsResource(self._http)
         self.agents = AgentsResource(self._http, base_url=self._base_url, api_key=key)
         self.account = AccountResource(self._http)
+
+    @property
+    def last_request_id(self) -> str | None:
+        """Server-issued request id from the most recent HTTP call.
+        Useful for support tickets — paste this when reporting a bug."""
+        return self._http.last_request_id
 
     def close(self) -> None:
         self._http.close()
@@ -105,11 +129,21 @@ class AsyncVocence:
         base_url: str | None = None,
         timeout: float = DEFAULT_TIMEOUT,
         http_client: httpx.AsyncClient | None = None,
+        max_retries: int = 2,
+        retry_mutations_on_5xx: bool = False,
     ) -> None:
+        """Async counterpart of :class:`Vocence`. Same retry semantics."""
         key = _resolve_key(api_key)
         self._api_key = key
         self._base_url = _resolve_base_url(base_url)
-        self._http = AsyncHttp(key, base_url=self._base_url, timeout=timeout, http_client=http_client)
+        self._http = AsyncHttp(
+            key,
+            base_url=self._base_url,
+            timeout=timeout,
+            http_client=http_client,
+            max_retries=max_retries,
+            retry_mutations_on_5xx=retry_mutations_on_5xx,
+        )
 
         self.tts = AsyncTtsResource(self._http)
         self.stt = AsyncSttResource(self._http)
@@ -119,6 +153,10 @@ class AsyncVocence:
         self.agent_tools = AsyncAgentToolsResource(self._http)
         self.agents = AsyncAgentsResource(self._http, base_url=self._base_url, api_key=key)
         self.account = AsyncAccountResource(self._http)
+
+    @property
+    def last_request_id(self) -> str | None:
+        return self._http.last_request_id
 
     async def aclose(self) -> None:
         await self._http.aclose()
