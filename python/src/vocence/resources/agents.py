@@ -9,6 +9,7 @@ from ..types import Agent, AgentSummary, CustomTool
 
 if TYPE_CHECKING:
     from .._streaming import AgentSession
+    from .._streaming_sync import SyncAgentSession
 
 
 class _AgentsBase:
@@ -37,8 +38,10 @@ class _AgentToolBindings:
 
 
 class AgentsResource(_AgentsBase):
-    def __init__(self, http: object) -> None:
+    def __init__(self, http: object, *, base_url: str, api_key: str) -> None:
         self._http = http
+        self._base_url = base_url
+        self._api_key = api_key
 
     def list(self) -> list[AgentSummary]:
         data = self._http.request("GET", self._path)  # type: ignore[attr-defined]
@@ -91,6 +94,31 @@ class AgentsResource(_AgentsBase):
     def tools(self, agent_id: str) -> _AgentToolBindings:
         """Tool-binding helper: ``client.agents.tools(agent_id).bind(tool_id)``."""
         return _AgentToolBindings(self._http, agent_id)
+
+    def session(self, agent_id: str) -> SyncAgentSession:
+        """Open a blocking WebSocket session with an agent.
+
+        Use as a regular context manager::
+
+            with client.agents.session("agent-id") as sess:
+                sess.send_text("hi")
+                for event in sess:
+                    print(event)
+                    if event.type == "turn_end":
+                        break
+
+        Async callers should use :class:`AsyncVocence` and
+        ``await client.agents.session(...)`` instead — that path is the
+        native flow and avoids the extra thread this wrapper spins up.
+        """
+        # Local import to keep `websockets` optional for REST-only users.
+        from .._streaming_sync import SyncAgentSession
+
+        ws_url = self._base_url.replace("http://", "ws://").replace("https://", "wss://")
+        return SyncAgentSession(
+            url=f"{ws_url}/v1/agents/{agent_id}/session",
+            api_key=self._api_key,
+        )
 
 
 # -------------------------------------------------------------------- async

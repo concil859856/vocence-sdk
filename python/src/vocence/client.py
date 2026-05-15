@@ -73,7 +73,7 @@ class Vocence:
         self.voice_design = VoiceDesignResource(self._http)
         self.voices = VoicesResource(self._http)
         self.agent_tools = AgentToolsResource(self._http)
-        self.agents = AgentsResource(self._http)
+        self.agents = AgentsResource(self._http, base_url=self._base_url, api_key=key)
         self.account = AccountResource(self._http)
 
     def close(self) -> None:

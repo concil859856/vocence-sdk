@@ -24,6 +24,7 @@ from ._errors import (
     VocenceError,
 )
 from ._streaming import AgentEvent, AgentSession, AudioFrame
+from ._streaming_sync import SyncAgentSession
 from ._version import __version__
 from .client import AsyncVocence, Vocence
 
@@ -39,6 +40,7 @@ __all__ = [
     "NotFoundError",
     "PermissionDeniedError",
     "RateLimitError",
+    "SyncAgentSession",
     "UpstreamError",
     "Vocence",
     "VocenceError",
