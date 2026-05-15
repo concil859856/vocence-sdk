@@ -6,7 +6,7 @@ import typer
 
 from ._common import get_client
 
-app = typer.Typer(no_args_is_help=True, help="Show plan and credit balance.")
+app = typer.Typer(invoke_without_command=True, help="Show plan and credit balance.")
 
 
 @app.callback(invoke_without_command=True)
