@@ -66,21 +66,24 @@ class TtsResource(_TtsBase):
         text: str,
         style_instruction: str | None = None,
         model: str | None = None,
+        timeout: float | None = None,
     ) -> TtsResponse:
         """PromptTTS — synthesize ``text`` in a voice described in prose.
 
         For a specific pre-defined speaker use :meth:`speak` instead.
         Up to 500 characters of text per call.
-        """
+
+        ``timeout`` overrides the client-level default for THIS call only —
+        useful for slow networks where 120s isn't enough."""
         body: dict[str, object] = {"text": text}
         if style_instruction is not None:
             body["style_instruction"] = style_instruction
         if model is not None:
             body["model"] = model
-        data = self._http.request("POST", self._generate_path, json=body)  # type: ignore[attr-defined]
+        data = self._http.request("POST", self._generate_path, json=body, timeout=timeout)  # type: ignore[attr-defined]
         return TtsResponse.model_validate(data)
 
-    def speak(self, *, text: str, voice: str) -> TtsResponse:
+    def speak(self, *, text: str, voice: str, timeout: float | None = None) -> TtsResponse:
         """Synthesize ``text`` in a pre-defined speaker's voice.
 
         Use :meth:`vocence.resources.voices.VoicesResource.builtin` to list
@@ -90,6 +93,7 @@ class TtsResource(_TtsBase):
             "POST",
             self._speak_path,
             json={"text": text, "voice": voice},
+            timeout=timeout,
         )
         return TtsResponse.model_validate(data)
 
@@ -104,19 +108,21 @@ class AsyncTtsResource(_TtsBase):
         text: str,
         style_instruction: str | None = None,
         model: str | None = None,
+        timeout: float | None = None,
     ) -> TtsResponse:
         body: dict[str, object] = {"text": text}
         if style_instruction is not None:
             body["style_instruction"] = style_instruction
         if model is not None:
             body["model"] = model
-        data = await self._http.request("POST", self._generate_path, json=body)  # type: ignore[attr-defined]
+        data = await self._http.request("POST", self._generate_path, json=body, timeout=timeout)  # type: ignore[attr-defined]
         return TtsResponse.model_validate(data)
 
-    async def speak(self, *, text: str, voice: str) -> TtsResponse:
+    async def speak(self, *, text: str, voice: str, timeout: float | None = None) -> TtsResponse:
         data = await self._http.request(  # type: ignore[attr-defined]
             "POST",
             self._speak_path,
             json={"text": text, "voice": voice},
+            timeout=timeout,
         )
         return TtsResponse.model_validate(data)

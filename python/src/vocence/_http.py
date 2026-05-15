@@ -180,14 +180,17 @@ class SyncHttp:
         params: dict[str, Any] | None = None,
         files: dict[str, tuple[str, BinaryIO | bytes, str]] | None = None,
         data: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         last_exc: VocenceError | None = None
+        # Per-call timeout override — httpx accepts a float for the
+        # whole-request budget.
+        kw: dict[str, Any] = {"json": json, "params": params, "files": files, "data": data}
+        if timeout is not None:
+            kw["timeout"] = timeout
         for attempt in range(self._max_retries + 1):
             try:
-                resp = self._client.request(
-                    method, path,
-                    json=json, params=params, files=files, data=data,
-                )
+                resp = self._client.request(method, path, **kw)
             except httpx.HTTPError as e:
                 last_exc = APIConnectionError(str(e))
             else:
@@ -263,14 +266,15 @@ class AsyncHttp:
         params: dict[str, Any] | None = None,
         files: dict[str, tuple[str, BinaryIO | bytes, str]] | None = None,
         data: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         last_exc: VocenceError | None = None
+        kw: dict[str, Any] = {"json": json, "params": params, "files": files, "data": data}
+        if timeout is not None:
+            kw["timeout"] = timeout
         for attempt in range(self._max_retries + 1):
             try:
-                resp = await self._client.request(
-                    method, path,
-                    json=json, params=params, files=files, data=data,
-                )
+                resp = await self._client.request(method, path, **kw)
             except httpx.HTTPError as e:
                 last_exc = APIConnectionError(str(e))
             else:
