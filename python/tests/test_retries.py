@@ -7,10 +7,8 @@ import pytest
 import respx
 
 from vocence import BadRequestError, RateLimitError, UpstreamError, Vocence
-from vocence._errors import APIConnectionError
 
 from .conftest import API_KEY, BASE_URL
-
 
 # Use a tiny base so the test suite stays fast (50 ms cap on backoff).
 _FAST_KW = {"max_retries": 3}

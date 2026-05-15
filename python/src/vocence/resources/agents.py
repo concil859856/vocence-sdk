@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from ..types import Agent, AgentSummary, CustomTool
 
 if TYPE_CHECKING:
+    from .._live import LiveChat
     from .._streaming import AgentSession
     from .._streaming_sync import SyncAgentSession
     from ..conversation import Conversation
@@ -226,6 +227,17 @@ class AsyncAgentsResource(_AgentsBase):
         from ..conversation import Conversation
 
         return Conversation(self.session(agent_id))
+
+    def live_chat(self, agent_id: str) -> LiveChat:
+        """Open a microphone-in / speaker-out session with an agent.
+
+        Requires ``pip install vocence[audio]`` for ``sounddevice`` +
+        ``numpy``. Push-to-talk: call :meth:`LiveChat.record` to start
+        capturing, then :meth:`LiveChat.stop_and_send` to ship the clip
+        and hear the reply played back through the default audio device."""
+        from .._live import LiveChat
+
+        return LiveChat(self.session(agent_id))
 
 
 # --------------------------------------------------------------- helpers

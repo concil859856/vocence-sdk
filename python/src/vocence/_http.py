@@ -21,7 +21,8 @@ from __future__ import annotations
 import asyncio
 import random
 import time
-from typing import Any, BinaryIO, Iterable
+from collections.abc import Iterable
+from typing import Any, BinaryIO
 
 import httpx
 

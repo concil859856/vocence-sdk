@@ -23,6 +23,7 @@ from ._errors import (
     UpstreamError,
     VocenceError,
 )
+from ._live import LiveChat
 from ._streaming import AgentEvent, AgentSession, AudioFrame
 from ._streaming_sync import SyncAgentSession
 from ._version import __version__
@@ -39,6 +40,7 @@ __all__ = [
     "BadRequestError",
     "Conversation",
     "InsufficientCreditsError",
+    "LiveChat",
     "NotFoundError",
     "PermissionDeniedError",
     "RateLimitError",
