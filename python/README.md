@@ -65,11 +65,34 @@ The session yields typed events: `ready`, `transcript`, `token`,
 `tool_call_started`, `tool_call_completed`, `audio_meta`, `audio` (binary PCM16),
 `audio_end`, `turn_end`, `error`.
 
+For one-shot turns (no streaming), use the higher-level conversation API:
+
+```python
+async with client.agents.conversation("agent-id") as conv:
+    turn = await conv.say("What's the weather in Tokyo?")
+    print(turn.text)                 # "It's 19 degrees..."
+    open("reply.pcm", "wb").write(turn.audio)
+    print(turn.audio_meta)            # {'sample_rate': 24000, 'frame_ms': 40, ...}
+```
+
+The sync `Vocence` client exposes `client.agents.session(agent_id)` as a
+blocking context manager — events are iterated with a normal `for` loop:
+
+```python
+with Vocence(api_key="voc_live_...").agents.session("agent-id") as sess:
+    sess.send_text("hi")
+    for event in sess:
+        if event.type == "turn_end":
+            break
+```
+
 ## CLI
 
 ```bash
-$ vocence login                          # paste your voc_live_... key once
+$ vocence login                          # opens a browser → approve → key saved
+$ vocence login --paste                  # or paste a key you generated on the website
 $ vocence account                        # show plan, credits remaining, key count
+$ vocence usage                          # last 20 API requests
 $ vocence keys list
 $ vocence keys create --name "laptop"
 $ vocence voices                         # list built-in speakers

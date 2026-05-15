@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-15
+
+### Added
+- **Sync WebSocket session** — ``client.agents.session(agent_id)`` on the
+  sync ``Vocence`` client now returns a blocking ``SyncAgentSession``
+  context manager, so non-async scripts can drive voice agents without
+  touching asyncio.
+- **High-level conversation helper** — ``client.agents.conversation(agent_id)``
+  on ``AsyncVocence`` wraps the raw event stream with batched ``say()`` /
+  ``send_voice()`` turn semantics. Each call returns a ``Turn`` carrying
+  the assistant's full text, all audio bytes concatenated, audio metadata,
+  and any tool calls the LLM made.
+- **``client.account.usage(limit=N)``** + **``vocence usage``** CLI command —
+  recent API request log (timestamp, endpoint, http status, credits, latency,
+  error info).
+- **Browser device-code login** — ``vocence login`` now opens
+  ``backend.vocence.ai/cli/authorize`` in a browser, polls for approval,
+  and stores the freshly-minted key. Old paste flow is still available
+  via ``--paste`` or ``--api-key voc_live_…``.
+
+### Fixed
+- Sync WS wrapper no longer races on shutdown: exceptions raised inside the
+  background event loop are now always observable from the consumer thread.
+
 ## [0.1.0] — 2026-05-15
 
 ### Added
