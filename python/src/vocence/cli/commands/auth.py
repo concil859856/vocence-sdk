@@ -19,13 +19,20 @@ from __future__ import annotations
 import sys
 import time
 import urllib.parse
-import urllib.request
 import webbrowser
 
+import httpx
 import typer
 
 from ... import Vocence, errors
+from ..._version import __version__
 from .. import config
+
+# Cloudflare's default WAF in front of *.vocence.ai blocks the literal
+# ``Python-urllib/3.x`` user-agent. We send our SDK's canonical UA so
+# the CLI flow doesn't get bounced at the edge before it reaches the
+# device-code endpoint.
+_UA = f"vocence-python/{__version__}"
 
 
 def login(
@@ -99,7 +106,18 @@ def _default_backend_url() -> str:
 def _device_flow(*, backend_url: str | None, timeout: int) -> str:
     base = (backend_url or _default_backend_url()).rstrip("/")
     # 1. Start the flow.
-    code = _http_post_json(f"{base}/api/cli/device-code", body=b"")
+    try:
+        code = _http_post_json(f"{base}/api/cli/device-code", body=b"")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise _DeviceFlowError(
+                f"the backend at {base} does not implement the CLI login flow "
+                "yet. Use `vocence login --paste` instead, or point at a "
+                "backend that has it via VOCENCE_BACKEND_URL."
+            ) from e
+        raise _DeviceFlowError(f"HTTP {e.response.status_code} from {base}: {e}") from e
+    except httpx.HTTPError as e:
+        raise _DeviceFlowError(f"could not reach {base}: {e}") from e
     user_code: str = code["user_code"]
     device_code: str = code["device_code"]
     verify_url: str = code["verification_url"]
@@ -123,7 +141,7 @@ def _device_flow(*, backend_url: str | None, timeout: int) -> str:
         time.sleep(interval)
         try:
             r = _http_get_json(f"{base}/api/cli/devices/{urllib.parse.quote(device_code)}")
-        except urllib.error.URLError as e:
+        except httpx.HTTPError as e:
             raise _DeviceFlowError(f"network error: {e}") from e
         status = r.get("status", "")
         if status != last_status:
@@ -173,28 +191,24 @@ def _verify_and_save(key: str) -> None:
     )
 
 
-# ----- tiny stdlib HTTP helpers --------------------------------------------
+# ----- HTTP helpers -------------------------------------------------------
+#
+# We use httpx (the SDK's existing HTTP dependency) instead of stdlib
+# urllib so the User-Agent matches the rest of the SDK
+# (``vocence-python/X.Y.Z``). Cloudflare's default WAF rules in front of
+# vocence.ai hosts return 403 for the literal ``Python-urllib/3.x`` UA,
+# which previously made ``vocence login`` fail at the edge before the
+# request even reached our backend.
 
 
 def _http_post_json(url: str, *, body: bytes) -> dict:
-    req = urllib.request.Request(
-        url,
-        data=body or b"",
-        method="POST",
-        headers={"Content-Type": "application/json", "Content-Length": str(len(body or b""))},
-    )
-    return _open(req)
+    headers = {"Content-Type": "application/json", "User-Agent": _UA}
+    resp = httpx.post(url, content=body or b"", headers=headers, timeout=30.0)
+    resp.raise_for_status()
+    return resp.json() if resp.content else {}
 
 
 def _http_get_json(url: str) -> dict:
-    req = urllib.request.Request(url, method="GET")
-    return _open(req)
-
-
-def _open(req: urllib.request.Request) -> dict:
-    import json
-    with urllib.request.urlopen(req, timeout=30) as resp:  # noqa: S310 — controlled URL
-        raw = resp.read()
-    if not raw:
-        return {}
-    return json.loads(raw)
+    resp = httpx.get(url, headers={"User-Agent": _UA}, timeout=30.0)
+    resp.raise_for_status()
+    return resp.json() if resp.content else {}
