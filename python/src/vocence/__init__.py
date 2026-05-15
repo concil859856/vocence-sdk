@@ -27,6 +27,7 @@ from ._streaming import AgentEvent, AgentSession, AudioFrame
 from ._streaming_sync import SyncAgentSession
 from ._version import __version__
 from .client import AsyncVocence, Vocence
+from .conversation import Conversation, Turn
 
 __all__ = [
     "APIConnectionError",
@@ -36,11 +37,13 @@ __all__ = [
     "AudioFrame",
     "AuthenticationError",
     "BadRequestError",
+    "Conversation",
     "InsufficientCreditsError",
     "NotFoundError",
     "PermissionDeniedError",
     "RateLimitError",
     "SyncAgentSession",
+    "Turn",
     "UpstreamError",
     "Vocence",
     "VocenceError",

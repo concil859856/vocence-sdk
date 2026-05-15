@@ -10,6 +10,7 @@ from ..types import Agent, AgentSummary, CustomTool
 if TYPE_CHECKING:
     from .._streaming import AgentSession
     from .._streaming_sync import SyncAgentSession
+    from ..conversation import Conversation
 
 
 class _AgentsBase:
@@ -214,6 +215,17 @@ class AsyncAgentsResource(_AgentsBase):
             url=f"{ws_url}/v1/agents/{agent_id}/session",
             api_key=self._api_key,
         )
+
+    def conversation(self, agent_id: str) -> Conversation:
+        """High-level voice chat. Same WS connection under the hood as
+        :meth:`session`, but you get :meth:`Conversation.say` /
+        :meth:`Conversation.send_voice` that block until the assistant
+        finishes a turn and return an aggregated :class:`Turn` object
+        (text, full audio bytes, tool calls). For token-level streaming
+        drop down to :meth:`session` instead."""
+        from ..conversation import Conversation
+
+        return Conversation(self.session(agent_id))
 
 
 # --------------------------------------------------------------- helpers

@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import queue
 import threading
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from ._errors import VocenceError
 from ._streaming import AgentEvent, AgentSession, AudioFrame
