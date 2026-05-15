@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-15
+
+### Added
+- **Audio download helpers** on ``TtsResponse`` / ``CloneResponse`` /
+  ``AudioResponse``: ``.download() -> bytes`` and ``.write_wav(path)``.
+  No more ``httpx.get(resp.audio_url).content`` boilerplate.
+- **``client.tts.estimate(text, voice=...)``** — local credit-cost
+  calculation; no HTTP round-trip.
+- **``client.health()``** / **``client.aping()``** — quick readiness +
+  auth verification, no charge.
+- **``vocence.batch`` module** — ``tts_speak``, ``tts_generate``,
+  ``stt_transcribe`` async helpers with ``max_concurrency`` cap and
+  ``BatchError`` per-item failure wrapping (one bad row doesn't kill
+  the run).
+- **Per-request ``timeout=`` override** on TTS resource methods (and
+  the underlying HTTP transport).
+- **Voice clone from URL** — ``client.voice_clone.create(audio_url="https://…")``
+  fetches the clip client-side and base64-encodes it transparently.
+- **``vocence.webhooks`` module** — HMAC-SHA256 signature verification
+  for custom-tool webhooks (``X-Vocence-Signature`` / ``X-Vocence-Timestamp``
+  headers, replay protection, FastAPI dependency helper). Ready as soon
+  as the backend ships outbound signing.
+
 ## [0.3.0] — 2026-05-15
 
 ### Added

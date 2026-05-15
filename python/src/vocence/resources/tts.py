@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from ..types import TtsResponse
 
-
 # Pricing constants (mirror developer-api/.env.example defaults). We
 # expose these so callers can compute costs locally without rounding
 # through a billing call. If the server changes pricing these stay in
