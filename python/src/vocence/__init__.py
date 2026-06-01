@@ -27,6 +27,8 @@ from ._errors import (
 from ._live import LiveChat
 from ._streaming import AgentEvent, AgentSession, AudioFrame
 from ._streaming_sync import SyncAgentSession
+from ._stt_stream import SttStreamEvent, SttStreamSession
+from ._tts_stream import TtsStreamEvent, TtsStreamSession
 from ._version import __version__
 from .client import AsyncVocence, Vocence
 from .conversation import Conversation, Turn
@@ -46,7 +48,11 @@ __all__ = [
     "PermissionDeniedError",
     "RateLimitError",
     "SessionEndedError",
+    "SttStreamEvent",
+    "SttStreamSession",
     "SyncAgentSession",
+    "TtsStreamEvent",
+    "TtsStreamSession",
     "Turn",
     "UpstreamError",
     "Vocence",

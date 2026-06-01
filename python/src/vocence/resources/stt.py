@@ -1,12 +1,23 @@
-"""Speech-to-text endpoint — ``POST /v1/stt/transcribe``."""
+"""Speech-to-text endpoints — ``POST /v1/stt/transcribe`` (one-shot)
+and ``client.stt.stream(...)`` (live PCM in → transcripts out)."""
 
 from __future__ import annotations
 
 import base64
 from pathlib import Path
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 from ..types import SttResponse
+
+if TYPE_CHECKING:
+    from .._stt_stream import SttStreamSession
+
+
+def _stt_ws_url(base_url: str) -> str:
+    return (
+        base_url.replace("http://", "ws://").replace("https://", "wss://")
+        + "/v1/stt/stream"
+    )
 
 
 def _b64_audio(
@@ -38,8 +49,47 @@ class _SttBase:
 
 
 class SttResource(_SttBase):
-    def __init__(self, http: object) -> None:
+    def __init__(
+        self,
+        http: object,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self._http = http
+        # Streaming-only fields. Optional so the existing
+        # ``SttResource(http)`` call site still works.
+        self._base_url = base_url or ""
+        self._api_key = api_key or ""
+
+    def stream(
+        self,
+        *,
+        language: str = "English",
+        sample_rate: int = 16000,
+        encoding: str = "pcm_s16le",
+        enable_partials: bool = True,
+        vad_events: bool = False,
+    ) -> "SttStreamSession":
+        """Open a streaming-STT WebSocket. Returns an async context
+        manager — see :mod:`vocence._stt_stream` for usage.
+
+        ``sample_rate`` must match what you'll send in :meth:`send_pcm`
+        (the pod uses it for the input feature extraction). 16 kHz mono
+        s16le PCM is the only combination both the pod and our pricing
+        currently support.
+        """
+        from .._stt_stream import SttStreamSession
+
+        return SttStreamSession(
+            url=_stt_ws_url(self._base_url),
+            api_key=self._api_key,
+            language=language,
+            sample_rate=sample_rate,
+            encoding=encoding,
+            enable_partials=enable_partials,
+            vad_events=vad_events,
+        )
 
     def transcribe(
         self,
@@ -69,8 +119,37 @@ class SttResource(_SttBase):
 
 
 class AsyncSttResource(_SttBase):
-    def __init__(self, http: object) -> None:
+    def __init__(
+        self,
+        http: object,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self._http = http
+        self._base_url = base_url or ""
+        self._api_key = api_key or ""
+
+    def stream(
+        self,
+        *,
+        language: str = "English",
+        sample_rate: int = 16000,
+        encoding: str = "pcm_s16le",
+        enable_partials: bool = True,
+        vad_events: bool = False,
+    ) -> "SttStreamSession":
+        from .._stt_stream import SttStreamSession
+
+        return SttStreamSession(
+            url=_stt_ws_url(self._base_url),
+            api_key=self._api_key,
+            language=language,
+            sample_rate=sample_rate,
+            encoding=encoding,
+            enable_partials=enable_partials,
+            vad_events=vad_events,
+        )
 
     async def transcribe(
         self,

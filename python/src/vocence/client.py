@@ -128,8 +128,8 @@ class Vocence:
             retry_mutations_on_5xx=retry_mutations_on_5xx,
         )
 
-        self.tts = TtsResource(self._http)
-        self.stt = SttResource(self._http)
+        self.tts = TtsResource(self._http, base_url=self._base_url, api_key=key)
+        self.stt = SttResource(self._http, base_url=self._base_url, api_key=key)
         self.voice_clone = VoiceCloneResource(self._http)
         self.voice_design = VoiceDesignResource(self._http)
         self.voices = VoicesResource(self._http)
@@ -208,8 +208,8 @@ class AsyncVocence:
             retry_mutations_on_5xx=retry_mutations_on_5xx,
         )
 
-        self.tts = AsyncTtsResource(self._http)
-        self.stt = AsyncSttResource(self._http)
+        self.tts = AsyncTtsResource(self._http, base_url=self._base_url, api_key=key)
+        self.stt = AsyncSttResource(self._http, base_url=self._base_url, api_key=key)
         self.voice_clone = AsyncVoiceCloneResource(self._http)
         self.voice_design = AsyncVoiceDesignResource(self._http)
         self.voices = AsyncVoicesResource(self._http)

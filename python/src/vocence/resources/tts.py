@@ -1,11 +1,24 @@
-"""Text-to-speech endpoints — ``POST /v1/tts/generate`` and
-``POST /v1/tts/speak``."""
+"""Text-to-speech endpoints — ``POST /v1/tts/generate``,
+``POST /v1/tts/speak``, and streaming WS ``client.tts.stream(voice_id)``."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..types import TtsResponse
+
+if TYPE_CHECKING:
+    from .._tts_stream import TtsStreamSession
+
+
+def _ws_url_for(base_url: str, voice_id: int) -> str:
+    """Compose the WS URL from the HTTP base, mirroring the helper in
+    ``resources/agents.py``."""
+    return (
+        base_url.replace("http://", "ws://").replace("https://", "wss://")
+        + f"/v1/voices/{voice_id}/stream"
+    )
 
 # Pricing constants (mirror developer-api/.env.example defaults). We
 # expose these so callers can compute costs locally without rounding
@@ -56,8 +69,37 @@ class _TtsBase:
 
 
 class TtsResource(_TtsBase):
-    def __init__(self, http: object) -> None:
+    def __init__(
+        self,
+        http: object,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self._http = http
+        # ``base_url`` + ``api_key`` are only used by :meth:`stream` —
+        # kept optional so the historical ``TtsResource(http)`` call
+        # site still works for REST-only callers.
+        self._base_url = base_url or ""
+        self._api_key = api_key or ""
+
+    def stream(self, voice_id: int) -> "TtsStreamSession":
+        """Open a streaming-TTS WebSocket bound to a pre-registered voice.
+
+        Returns an async context manager. Inside it, call :meth:`speak`
+        and iterate to receive ``meta`` + binary ``audio`` + ``end``
+        events. See :mod:`vocence._tts_stream` for the full event shape.
+
+        ``voice_id`` is the integer id from
+        :meth:`vocence.resources.voices.VoicesResource.list` (designed
+        or cloned voice owned by the API key's user).
+        """
+        from .._tts_stream import TtsStreamSession
+
+        return TtsStreamSession(
+            url=_ws_url_for(self._base_url, voice_id),
+            api_key=self._api_key,
+        )
 
     def generate(
         self,
@@ -98,8 +140,28 @@ class TtsResource(_TtsBase):
 
 
 class AsyncTtsResource(_TtsBase):
-    def __init__(self, http: object) -> None:
+    def __init__(
+        self,
+        http: object,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
         self._http = http
+        self._base_url = base_url or ""
+        self._api_key = api_key or ""
+
+    def stream(self, voice_id: int) -> "TtsStreamSession":
+        """Async-side identical to :meth:`TtsResource.stream`. Note
+        that ``TtsStreamSession`` is the same class on both sides —
+        it's natively async and the sync client wraps it the same
+        way ``Vocence.agents.session`` does."""
+        from .._tts_stream import TtsStreamSession
+
+        return TtsStreamSession(
+            url=_ws_url_for(self._base_url, voice_id),
+            api_key=self._api_key,
+        )
 
     async def generate(
         self,
