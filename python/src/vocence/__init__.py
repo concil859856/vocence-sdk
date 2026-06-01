@@ -20,6 +20,7 @@ from ._errors import (
     NotFoundError,
     PermissionDeniedError,
     RateLimitError,
+    SessionEndedError,
     UpstreamError,
     VocenceError,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "NotFoundError",
     "PermissionDeniedError",
     "RateLimitError",
+    "SessionEndedError",
     "SyncAgentSession",
     "Turn",
     "UpstreamError",

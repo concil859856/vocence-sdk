@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-06-01
+
+### Added
+
+- **`SessionEndedError`** — typed exception raised when the server
+  closes an agent WebSocket session before the caller asks it to.
+  Carries `reason` (`"max_duration"` / `"idle_timeout"` /
+  `"agent_paused"`) and the raw `code`, so apps can distinguish
+  "session naturally timed out" from "agent was paused" without
+  parsing close-code numbers.
+- **Client-side URL scheme guard** on `knowledge.ingest_url` /
+  `knowledge.ingest_sitemap`. Non-HTTP schemes (`file://`, `ftp://`,
+  …) and obvious private hosts (`localhost`, `127.x`,
+  `169.254.169.254`) now raise `ValueError` *before* the HTTP round-
+  trip instead of returning a server-side HTTP 400. Server-side
+  validation (with DNS resolution) is unchanged and remains the
+  authoritative check.
+
+### Improved
+
+- Close-code mapping in `AgentSession` now covers
+  `4402 → InsufficientCreditsError`, `4429 → RateLimitError`,
+  `{4408, 4410, 4423} → SessionEndedError`, `{4500, 4502, 4503} →
+  UpstreamError` in addition to the existing `4401 / 4404` mappings.
+  Previously these codes ended iteration silently — callers had no
+  way to distinguish a timeout from a payment failure.
+
 ## [0.6.0] — 2026-06-01
 
 ### Added

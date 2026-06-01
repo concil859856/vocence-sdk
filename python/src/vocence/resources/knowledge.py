@@ -20,12 +20,45 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import IO, Any, Union
+from urllib.parse import urlparse
 
 
 # A PDF upload can be either a filesystem path or an already-opened
 # file-like object. The async / sync resources resolve both into raw
 # bytes before they reach the HTTP layer.
 PdfInput = Union[str, Path, bytes, IO[bytes]]
+
+
+def _check_public_http_url(url: str) -> None:
+    """Reject obviously-bad URLs client-side so the SDK fails fast
+    with a clear ``ValueError`` instead of round-tripping a ``file://``
+    or private-host URL to the server only to get back a 400.
+
+    The server enforces a stricter check (it also DNS-resolves the
+    host and rejects anything that maps to a private / loopback /
+    link-local IP). This is just the obvious-case guard."""
+    try:
+        parsed = urlparse(url)
+    except Exception as e:
+        raise ValueError(f"could not parse url: {url!r}") from e
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"url scheme must be http or https, got {parsed.scheme!r} — "
+            "the knowledge crawler will reject this server-side."
+        )
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        raise ValueError(f"url has no hostname: {url!r}")
+    if host in ("localhost",) or host.startswith("127.") or host == "0.0.0.0":
+        raise ValueError(
+            f"url points at a loopback / unspecified host ({host!r}) — "
+            "the knowledge crawler runs server-side and will reject this."
+        )
+    if host == "169.254.169.254":
+        raise ValueError(
+            "url points at a cloud-metadata endpoint (169.254.169.254) — "
+            "rejected as a SSRF vector."
+        )
 
 
 def _read_pdf(source: PdfInput) -> tuple[bytes, str]:
@@ -96,11 +129,14 @@ class KnowledgeResource:
         """Ingest a single page (max_depth=0) or page + one hop of internal links (max_depth=1).
 
         ``url`` must be an ``http://`` or ``https://`` URL on a public
-        host. Private / loopback / link-local hosts, cloud-metadata
-        endpoints (e.g. ``169.254.169.254``), and non-HTTP schemes
-        (``file://``, ``ftp://``, …) are rejected server-side with
-        HTTP 400 to prevent SSRF via the crawler.
+        host. Non-HTTP schemes (``file://``, ``ftp://``, …) and obvious
+        private hosts (localhost / 127.x / 169.254.169.254) raise
+        :class:`ValueError` client-side before any network call. The
+        server also DNS-resolves the host and rejects anything that
+        maps to a private / loopback / link-local IP, so DNS-rebinding
+        attacks don't help either.
         """
+        _check_public_http_url(url)
         return self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/url",
             json=_ingest_body(url=url, title=title, max_depth=max_depth),
@@ -118,10 +154,11 @@ class KnowledgeResource:
         """Crawl a sitemap.xml and ingest every page (capped at ``max_pages``,
         with optional include/exclude regex filters applied to each URL).
 
-        Same URL safety rules as :meth:`ingest_url` — public ``http``/
-        ``https`` only; private hosts and metadata endpoints are
-        rejected server-side.
+        Same URL safety rules as :meth:`ingest_url` — ``ValueError``
+        client-side on non-public-http URLs, server-side DNS check
+        backs it up.
         """
+        _check_public_http_url(url)
         return self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/sitemap",
             json=_ingest_body(
@@ -188,6 +225,7 @@ class AsyncKnowledgeResource:
         title: str | None = None,
         max_depth: int = 0,
     ) -> dict:
+        _check_public_http_url(url)
         return await self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/url",
             json=_ingest_body(url=url, title=title, max_depth=max_depth),
@@ -202,6 +240,7 @@ class AsyncKnowledgeResource:
         exclude: list[str] | None = None,
         max_pages: int = 500,
     ) -> dict:
+        _check_public_http_url(url)
         return await self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/sitemap",
             json=_ingest_body(

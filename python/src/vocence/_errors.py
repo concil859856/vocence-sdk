@@ -83,6 +83,36 @@ class UpstreamError(VocenceError):
     server, voice-clone inference). The caller can usually retry."""
 
 
+class SessionEndedError(VocenceError):
+    """An agent WebSocket session was closed by the server before the
+    caller asked it to. The ``reason`` attribute is one of:
+
+    * ``"max_duration"`` (close code 4408) — the session hit its
+      maximum length (default 30 minutes). Open a new session to
+      continue.
+    * ``"idle_timeout"`` (close code 4410) — no activity for the idle
+      window (default 60 s after the agent stopped talking).
+    * ``"agent_paused"`` (close code 4423) — the agent was paused or
+      archived between session-start and now. Unpause it from the
+      Studio settings.
+
+    ``code`` is the raw WS close code; ``message`` is the human-readable
+    reason string the server sent in the close frame, if any.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str,
+        code: int,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, **kwargs)
+        self.reason = reason
+        self.code = code
+
+
 class APIConnectionError(VocenceError):
     """Network-level failure — DNS, TLS, connection refused, etc."""
 

@@ -27,7 +27,10 @@ from websockets.exceptions import ConnectionClosed
 from ._errors import (
     APIConnectionError,
     AuthenticationError,
+    InsufficientCreditsError,
     NotFoundError,
+    RateLimitError,
+    SessionEndedError,
     UpstreamError,
     VocenceError,
 )
@@ -61,12 +64,41 @@ class AudioFrame:
     type: str = "audio"
 
 
-_CloseCodeError: dict[int, type[VocenceError]] = {
-    4401: AuthenticationError,
-    4404: NotFoundError,
-    4502: UpstreamError,
-    4503: UpstreamError,
+# Backend close-code semantics — mirror dashboard-backend/routers/voicechat.py.
+# Each entry is (raw close code, factory taking the server-supplied
+# close-reason string and returning a typed SDK exception). Codes not
+# in the map fall through to ``ConnectionClosed`` and end iteration
+# (e.g. 1000 normal close).
+_SESSION_ENDED_REASONS = {
+    4408: "max_duration",
+    4410: "idle_timeout",
+    4423: "agent_paused",
 }
+
+
+def _build_close_code_error(code: int, msg: str) -> VocenceError | None:
+    """Return the typed SDK error for a WS close code, or None if the
+    code is benign / unknown and the iteration should end normally."""
+    if code == 4401:
+        return AuthenticationError(msg or f"WebSocket closed with code {code}")
+    if code == 4402:
+        return InsufficientCreditsError(
+            msg or "session ended — insufficient credits or premium required"
+        )
+    if code == 4404:
+        return NotFoundError(msg or f"WebSocket closed with code {code}")
+    if code == 4429:
+        return RateLimitError(msg or "rate limit exceeded")
+    if code in _SESSION_ENDED_REASONS:
+        reason = _SESSION_ENDED_REASONS[code]
+        return SessionEndedError(
+            msg or f"session ended: {reason}",
+            reason=reason,
+            code=code,
+        )
+    if code in (4500, 4502, 4503):
+        return UpstreamError(msg or f"WebSocket closed with code {code}")
+    return None
 
 
 class AgentSession:
@@ -289,8 +321,10 @@ class AgentSession:
                     yield AgentEvent(type=str(data.get("type") or ""), data=data)
         except ConnectionClosed as e:
             code = getattr(e, "code", 0) or 0
-            if code and code in _CloseCodeError:
-                raise _CloseCodeError[code](f"WebSocket closed with code {code}") from e
+            reason = (getattr(e, "reason", None) or "").strip()
+            err = _build_close_code_error(code, reason)
+            if err is not None:
+                raise err from e
             # Normal close (1000 etc.) just ends the iteration.
             return
 
