@@ -93,7 +93,14 @@ class KnowledgeResource:
         title: str | None = None,
         max_depth: int = 0,
     ) -> dict:
-        """Ingest a single page (max_depth=0) or page + one hop of internal links (max_depth=1)."""
+        """Ingest a single page (max_depth=0) or page + one hop of internal links (max_depth=1).
+
+        ``url`` must be an ``http://`` or ``https://`` URL on a public
+        host. Private / loopback / link-local hosts, cloud-metadata
+        endpoints (e.g. ``169.254.169.254``), and non-HTTP schemes
+        (``file://``, ``ftp://``, …) are rejected server-side with
+        HTTP 400 to prevent SSRF via the crawler.
+        """
         return self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/url",
             json=_ingest_body(url=url, title=title, max_depth=max_depth),
@@ -109,7 +116,12 @@ class KnowledgeResource:
         max_pages: int = 500,
     ) -> dict:
         """Crawl a sitemap.xml and ingest every page (capped at ``max_pages``,
-        with optional include/exclude regex filters applied to each URL)."""
+        with optional include/exclude regex filters applied to each URL).
+
+        Same URL safety rules as :meth:`ingest_url` — public ``http``/
+        ``https`` only; private hosts and metadata endpoints are
+        rejected server-side.
+        """
         return self._http.request(  # type: ignore[attr-defined]
             "POST", f"{self._base}/ingest/sitemap",
             json=_ingest_body(
