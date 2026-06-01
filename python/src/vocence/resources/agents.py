@@ -39,6 +39,38 @@ class _AgentToolBindings:
         self._http.request("DELETE", f"{self._base}/{tool_id}")  # type: ignore[attr-defined]
 
 
+class _AgentRuns:
+    """Sync helper for goal-agent runs:
+    ``client.agents.runs(agent_id).{list,start,get,cancel}(...)``.
+
+    Only meaningful for agents whose ``type == 'goal'`` — knowledge
+    agents have no run loop, and ``list`` returns ``[]`` for them so
+    callers don't need a special-case branch."""
+
+    def __init__(self, http: object, agent_id: str) -> None:
+        self._http = http
+        self._base = f"/v1/agents/{agent_id}/runs"
+
+    def list(self) -> list[dict]:
+        data = self._http.request("GET", self._base)  # type: ignore[attr-defined]
+        return list(data.get("runs") or [])
+
+    def start(self) -> dict:
+        """Kick off a new run. Returns the run row in ``pending`` state —
+        poll :meth:`get` for progress. Raises if the agent is paused /
+        archived or has no goal configured."""
+        data = self._http.request("POST", self._base, json={})  # type: ignore[attr-defined]
+        return dict(data.get("run") or data)
+
+    def get(self, run_id: str) -> dict:
+        data = self._http.request("GET", f"{self._base}/{run_id}")  # type: ignore[attr-defined]
+        return dict(data.get("run") or data)
+
+    def cancel(self, run_id: str) -> dict:
+        """Idempotent — succeeds even if the run already finished."""
+        return self._http.request("POST", f"{self._base}/{run_id}/cancel", json={})  # type: ignore[attr-defined]
+
+
 class AgentsResource(_AgentsBase):
     def __init__(self, http: object, *, base_url: str, api_key: str) -> None:
         self._http = http
@@ -97,6 +129,91 @@ class AgentsResource(_AgentsBase):
         """Tool-binding helper: ``client.agents.tools(agent_id).bind(tool_id)``."""
         return _AgentToolBindings(self._http, agent_id)
 
+    def runs(self, agent_id: str) -> _AgentRuns:
+        """Goal-agent run helper: ``client.agents.runs(id).start()``."""
+        return _AgentRuns(self._http, agent_id)
+
+    # ----- discovery: templates / models / built-in tools -----
+
+    def templates(self) -> list[dict]:
+        """Starter-template gallery for an agent-builder UI. Compact
+        summaries only — call :meth:`template` for the full body."""
+        data = self._http.request("GET", "/v1/agents/templates")  # type: ignore[attr-defined]
+        return list(data.get("templates") or [])
+
+    def template(self, template_id: str) -> dict:
+        """Full template body (system_prompt + knowledge_starter).
+        Snapshot semantics — saved agents own their own copy."""
+        return self._http.request(  # type: ignore[attr-defined]
+            "GET", f"/v1/agents/templates/{template_id}",
+        )
+
+    def models(self) -> list[dict]:
+        """LLM models the agent picker offers on this deployment. Pass
+        any returned ``id`` as ``llm_model`` to :meth:`create` or
+        :meth:`update`."""
+        data = self._http.request("GET", "/v1/agents/models")  # type: ignore[attr-defined]
+        return list(data.get("models") or [])
+
+    def builtin_tools(self) -> list[dict]:
+        """Catalog of built-in tools (web search, weather, datetime,
+        etc.). Each entry tells you whether the tool is configured
+        server-side. To enable on an agent, list the tool ``id`` in
+        ``enabled_tools`` on :meth:`create` / :meth:`update`."""
+        data = self._http.request("GET", "/v1/agents/tools/builtin")  # type: ignore[attr-defined]
+        return list(data.get("tools") or [])
+
+    # ----- LLM-powered authoring -----
+
+    def draft(
+        self,
+        description: str,
+        *,
+        type_hint: str | None = None,
+        existing: dict | None = None,
+    ) -> dict:
+        """One-shot: produce a complete agent spec from a plain-English
+        description. For an iterative back-and-forth flow, use
+        :meth:`architect_chat` instead."""
+        body: dict[str, Any] = {"description": description}
+        if type_hint is not None:
+            body["type_hint"] = type_hint
+        if existing is not None:
+            body["existing"] = existing
+        return self._http.request("POST", "/v1/agents/draft", json=body)  # type: ignore[attr-defined]
+
+    def architect_chat(
+        self,
+        message: str,
+        *,
+        history: list[dict] | None = None,
+        existing: dict | None = None,
+    ) -> dict:
+        """One conversational turn with the architect. Returns
+        ``{reply, proposed_changes}``. ``proposed_changes`` is non-None
+        only when the architect decided the user is asking for an edit
+        — show an "Apply" button to the user in that case, otherwise
+        treat ``reply`` as plain conversation."""
+        body: dict[str, Any] = {
+            "message": message,
+            "history": history or [],
+        }
+        if existing is not None:
+            body["existing"] = existing
+        return self._http.request(  # type: ignore[attr-defined]
+            "POST", "/v1/agents/architect/chat", json=body,
+        )
+
+    def knowledge(self, agent_id: str) -> "KnowledgeResource":
+        """Knowledge-ingest helper: ``client.agents.knowledge(id).ingest_url(...)``."""
+        from .knowledge import KnowledgeResource
+        return KnowledgeResource(self._http, agent_id)
+
+    def embed_tokens(self, agent_id: str) -> "EmbedTokensResource":
+        """Embed-token helper: ``client.agents.embed_tokens(id).create(...)``."""
+        from .embed_tokens import EmbedTokensResource
+        return EmbedTokensResource(self._http, agent_id)
+
     def session(self, agent_id: str) -> SyncAgentSession:
         """Open a blocking WebSocket session with an agent.
 
@@ -140,6 +257,31 @@ class _AsyncAgentToolBindings:
 
     async def unbind(self, tool_id: str) -> None:
         await self._http.request("DELETE", f"{self._base}/{tool_id}")  # type: ignore[attr-defined]
+
+
+class _AsyncAgentRuns:
+    """Async sibling of :class:`_AgentRuns`."""
+
+    def __init__(self, http: object, agent_id: str) -> None:
+        self._http = http
+        self._base = f"/v1/agents/{agent_id}/runs"
+
+    async def list(self) -> list[dict]:
+        data = await self._http.request("GET", self._base)  # type: ignore[attr-defined]
+        return list(data.get("runs") or [])
+
+    async def start(self) -> dict:
+        data = await self._http.request("POST", self._base, json={})  # type: ignore[attr-defined]
+        return dict(data.get("run") or data)
+
+    async def get(self, run_id: str) -> dict:
+        data = await self._http.request("GET", f"{self._base}/{run_id}")  # type: ignore[attr-defined]
+        return dict(data.get("run") or data)
+
+    async def cancel(self, run_id: str) -> dict:
+        return await self._http.request(  # type: ignore[attr-defined]
+            "POST", f"{self._base}/{run_id}/cancel", json={},
+        )
 
 
 class AsyncAgentsResource(_AgentsBase):
@@ -196,6 +338,71 @@ class AsyncAgentsResource(_AgentsBase):
 
     def tools(self, agent_id: str) -> _AsyncAgentToolBindings:
         return _AsyncAgentToolBindings(self._http, agent_id)
+
+    def runs(self, agent_id: str) -> _AsyncAgentRuns:
+        return _AsyncAgentRuns(self._http, agent_id)
+
+    # ----- discovery -----
+
+    async def templates(self) -> list[dict]:
+        data = await self._http.request("GET", "/v1/agents/templates")  # type: ignore[attr-defined]
+        return list(data.get("templates") or [])
+
+    async def template(self, template_id: str) -> dict:
+        return await self._http.request(  # type: ignore[attr-defined]
+            "GET", f"/v1/agents/templates/{template_id}",
+        )
+
+    async def models(self) -> list[dict]:
+        data = await self._http.request("GET", "/v1/agents/models")  # type: ignore[attr-defined]
+        return list(data.get("models") or [])
+
+    async def builtin_tools(self) -> list[dict]:
+        data = await self._http.request("GET", "/v1/agents/tools/builtin")  # type: ignore[attr-defined]
+        return list(data.get("tools") or [])
+
+    # ----- LLM-powered authoring -----
+
+    async def draft(
+        self,
+        description: str,
+        *,
+        type_hint: str | None = None,
+        existing: dict | None = None,
+    ) -> dict:
+        body: dict[str, Any] = {"description": description}
+        if type_hint is not None:
+            body["type_hint"] = type_hint
+        if existing is not None:
+            body["existing"] = existing
+        return await self._http.request("POST", "/v1/agents/draft", json=body)  # type: ignore[attr-defined]
+
+    async def architect_chat(
+        self,
+        message: str,
+        *,
+        history: list[dict] | None = None,
+        existing: dict | None = None,
+    ) -> dict:
+        body: dict[str, Any] = {
+            "message": message,
+            "history": history or [],
+        }
+        if existing is not None:
+            body["existing"] = existing
+        return await self._http.request(  # type: ignore[attr-defined]
+            "POST", "/v1/agents/architect/chat", json=body,
+        )
+
+    def knowledge(self, agent_id: str) -> "AsyncKnowledgeResource":
+        """Async knowledge-ingest helper: ``await client.agents.knowledge(id).ingest_url(...)``."""
+        from .knowledge import AsyncKnowledgeResource
+        return AsyncKnowledgeResource(self._http, agent_id)
+
+    def embed_tokens(self, agent_id: str) -> "AsyncEmbedTokensResource":
+        """Async embed-token helper: ``await client.agents.embed_tokens(id).create(...)``."""
+        from .embed_tokens import AsyncEmbedTokensResource
+        return AsyncEmbedTokensResource(self._http, agent_id)
 
     def session(self, agent_id: str) -> AgentSession:
         """Open a real-time voice / text WebSocket session with an agent.

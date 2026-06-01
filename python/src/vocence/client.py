@@ -15,11 +15,13 @@ from .resources import (
     AsyncAccountResource,
     AsyncAgentsResource,
     AsyncAgentToolsResource,
+    AsyncFeedbackResource,
     AsyncSttResource,
     AsyncTtsResource,
     AsyncVoiceCloneResource,
     AsyncVoiceDesignResource,
     AsyncVoicesResource,
+    FeedbackResource,
     SttResource,
     TtsResource,
     VoiceCloneResource,
@@ -134,6 +136,7 @@ class Vocence:
         self.agent_tools = AgentToolsResource(self._http)
         self.agents = AgentsResource(self._http, base_url=self._base_url, api_key=key)
         self.account = AccountResource(self._http)
+        self.feedback = FeedbackResource(self._http)
 
     @property
     def last_request_id(self) -> str | None:
@@ -213,6 +216,7 @@ class AsyncVocence:
         self.agent_tools = AsyncAgentToolsResource(self._http)
         self.agents = AsyncAgentsResource(self._http, base_url=self._base_url, api_key=key)
         self.account = AsyncAccountResource(self._http)
+        self.feedback = AsyncFeedbackResource(self._http)
 
     @property
     def last_request_id(self) -> str | None:

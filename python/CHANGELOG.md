@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-01
+
+### Added
+
+- **`client.feedback`** — record thumbs-up / thumbs-down on a
+  generation so you can collect quality signal on the AI outputs
+  you ship to your own users.
+  ```python
+  client.feedback.submit(
+      entry_type="tts",          # or stt / voice_clone / voice_design /
+                                 # music / noise_remover / agent_call /
+                                 # agent_message
+      entry_id="job_abc123",
+      rating=-1,                 # -1 thumb-down, 1 thumb-up, 0 = un-vote
+      comment="Voice sounded robotic on long sentences",
+  )
+  state = client.feedback.get(entry_type="tts", entry_id="job_abc123")
+  ```
+  Async sibling via ``AsyncVocence.feedback``.
+
+- **Agent discovery endpoints** on ``client.agents``:
+  ``templates()`` / ``template(id)`` (starter gallery + full body),
+  ``models()`` (LLM picker), ``builtin_tools()`` (web-search, weather,
+  datetime, …). Use these to build your own agent-builder UI without
+  hard-coding the available options.
+
+- **LLM-powered agent authoring** on ``client.agents``:
+  ``draft(description, type_hint=None, existing=None)`` for a one-shot
+  spec generator, and ``architect_chat(message, history=[], existing=None)``
+  for the iterative back-and-forth flow the website's Architect Drawer
+  uses. ``architect_chat`` returns ``{reply, proposed_changes}`` —
+  show "Apply" only when ``proposed_changes`` is non-None.
+
+- **Goal-agent runs** at ``client.agents.runs(agent_id)`` —
+  ``list()`` / ``start()`` / ``get(run_id)`` / ``cancel(run_id)``.
+  Only meaningful for agents with ``type == 'goal'``. ``cancel`` is
+  idempotent; ``list`` returns ``[]`` for knowledge-style agents so
+  you can treat both uniformly.
+
+## [0.5.0] — 2026-06-01
+
+### Added
+
+- **Streaming voice on `AgentSession`**. Pair with the dashboard /
+  developer-api `capabilities.voice_stream` flag to push live PCM
+  frames instead of one-shot WAV uploads:
+  ```python
+  async with client.agents.session(agent_id) as sess:
+      caps = await sess.wait_ready()
+      if caps.get("voice_stream"):
+          await sess.start_stream()
+          for frame in pcm_frames():   # 16 kHz mono s16le
+              await sess.send_pcm(frame)
+          await sess.commit_stream()
+      else:
+          await sess.send_voice(wav_b64)
+  ```
+  New methods: ``start_stream``, ``send_pcm``, ``commit_stream``,
+  ``wait_ready``. ``session.capabilities`` and ``session.session_id``
+  are populated from the server's ``ready`` event whether you call
+  ``wait_ready`` or iterate the session directly.
+
+- **`client.agents.knowledge(agent_id)`** — per-agent RAG knowledge
+  ingestion mirroring `/v1/agents/{id}/knowledge/*`:
+  ``ingest_text``, ``ingest_markdown``, ``ingest_url``,
+  ``ingest_sitemap``, ``ingest_pdf`` (path / bytes / file-like),
+  ``sources``, ``delete_source``, ``job(job_id)`` for polling.
+  Async sibling available at ``await client.agents.knowledge(...)``.
+
+- **`client.agents.embed_tokens(agent_id)`** — mint, list, and revoke
+  embed tokens for the embeddable ``<vocence-agent>`` widget. The
+  plaintext is returned ONCE on create; subsequent listings return
+  metadata only.
+
+### Behaviour
+- Inherits the dashboard's recent voice-chat hardening transparently
+  via the WS relay: forward-frames wait-for-final, stray-commit
+  no-op, Logos default greeting on sessionless calls. No SDK
+  changes required.
+
 ## [0.4.0] — 2026-05-15
 
 ### Added
