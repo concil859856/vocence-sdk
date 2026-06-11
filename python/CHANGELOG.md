@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-11
+
+### Added
+
+- **`AgentSession.notify_audio_started()`** /
+  **`notify_audio_settled()`** — optional protocol hooks the client
+  can fire to tell the server when the agent's audio is actually
+  reaching the user's speakers vs has gone silent again. The server
+  uses these signals to latch / release a mic-mute gate, dropping
+  echo PCM frames before they reach STT. Pairs with
+  `start_stream()` / `send_pcm()`; pure `send_text` / `send_voice`
+  clients can ignore entirely. Both methods are also exposed on
+  `SyncAgentSession` as blocking calls.
+- README section "Optional: audio-lifecycle notifications (tighter
+  barge-in)" with a concrete code example showing where to fire
+  each method in a streaming-PCM client loop.
+
+### Notes
+
+- Skipping these notifications is safe — the server has a ~6 s
+  safety auto-release on the mic gate, so barge-in still works
+  without client participation. The protocol additions just make
+  interruption feel noticeably crisper for clients that opt in.
+- Backwards compatible. No existing API changed; this is purely
+  additive.
+
 ## [0.6.1] — 2026-06-01
 
 ### Added
