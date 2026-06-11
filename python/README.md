@@ -87,6 +87,37 @@ with Vocence(api_key="voc_live_...").agents.session("agent-id") as sess:
             break
 ```
 
+### Optional: audio-lifecycle notifications (tighter barge-in)
+
+When you're streaming user PCM back to the server (live mic input)
+AND playing the agent's reply through a speaker, you can tell the
+server exactly when the speakers go active vs. silent. The server
+uses these signals to drop echo PCM frames before they reach STT,
+which makes barge-in and interruption handling noticeably crisper.
+
+```python
+async with client.agents.session("agent-id") as sess:
+    await sess.start_stream()
+    async for event in sess:
+        if event.type == "audio" and not playback_started:
+            playback_started = True
+            await sess.notify_audio_started()      # speakers went hot
+            play(event.data)
+        elif event.type == "audio":
+            play(event.data)
+        elif event.type == "turn_end":
+            await wait_for_speaker_drain()
+            await sess.notify_audio_settled()      # speakers silent again
+            break
+```
+
+Both methods are optional. If you skip them (or one gets lost
+mid-flight), the server falls back to a 6 second safety auto-release
+on the mic gate — barge-in still works, it just feels a bit looser.
+
+Same contract on the sync `Vocence` client: `sess.notify_audio_started()`
+and `sess.notify_audio_settled()` are blocking calls.
+
 ## CLI
 
 ```bash

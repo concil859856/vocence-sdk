@@ -122,6 +122,21 @@ class AgentSession:
     ``capabilities`` is populated from the server's ``ready`` event the
     first time the session reads one. Call :meth:`wait_ready` to block
     until that arrives before deciding which path to use.
+
+    Optional audio-lifecycle notifications (recommended when you're
+    BOTH playing the agent's audio to a speaker AND streaming user
+    PCM back via :meth:`send_pcm`):
+
+    * :meth:`notify_audio_started` — call when the agent's audio
+      starts playing through the user's speakers.
+    * :meth:`notify_audio_settled` — call when playback finishes (or
+      a barge-in fade completes).
+
+    These let the server latch / release a mic-mute gate that drops
+    echo PCM frames before they reach STT. The server has a 6 s
+    safety auto-release if either notification gets lost, so omitting
+    them is non-fatal — but barge-in feels noticeably tighter when
+    the client participates in the protocol.
     """
 
     def __init__(self, *, url: str, api_key: str) -> None:
@@ -188,6 +203,47 @@ class AgentSession:
         the open-stream flag so a subsequent ``send_pcm`` will refuse."""
         await self._send({"type": "cancel"})
         self._stream_open = False
+
+    async def notify_audio_started(self) -> None:
+        """Tell the server the agent's audio is now reaching the user's
+        speakers. The server uses this to latch its mic-mute gate so
+        any PCM frames the client subsequently streams back (echo
+        leaking through the speakers, for example) are dropped at the
+        STT layer instead of being transcribed as user input.
+
+        OPTIONAL — only relevant when you're streaming the agent's
+        audio back to a real speaker AND also streaming user PCM
+        back via :meth:`send_pcm`. Pure-text or one-shot ``send_voice``
+        clients can ignore this entirely.
+
+        Fire once per turn, when the FIRST audio sample of that turn
+        actually plays through the speaker (NOT when the first
+        ``audio`` binary frame arrives from the server — they may be
+        seconds apart due to your local prebuffer). Pair with
+        :meth:`notify_audio_settled` when the audio is done playing or
+        when you cut it off for a barge-in.
+
+        Missing this notification doesn't break the call — the server
+        falls back to a ~6 s safety auto-release on the gate. But the
+        UX of barge-in / echo suppression is dramatically better when
+        the client tells the server exactly when the speakers go
+        active vs silent.
+        """
+        await self._send({"type": "client_audio_started"})
+
+    async def notify_audio_settled(self) -> None:
+        """Tell the server the agent's audio has finished playing
+        (queue drained naturally OR a barge-in fade completed). The
+        server releases its mic-mute gate, so user PCM frames flow
+        through to STT again on the next turn.
+
+        Pair with :meth:`notify_audio_started` — see that docstring
+        for when this matters. Idempotent on the server: a redundant
+        ``settled`` on an already-clear gate is a no-op, so it's safe
+        to fire it both on natural-end and on barge-in fade without
+        deduplicating.
+        """
+        await self._send({"type": "client_audio_settled"})
 
     async def start_stream(self) -> None:
         """Open a live PCM streaming turn.

@@ -109,6 +109,14 @@ class SyncAgentSession:
     def cancel(self) -> None:
         self._call(lambda s: s.cancel())
 
+    def notify_audio_started(self) -> None:
+        """See :meth:`AgentSession.notify_audio_started`."""
+        self._call(lambda s: s.notify_audio_started())
+
+    def notify_audio_settled(self) -> None:
+        """See :meth:`AgentSession.notify_audio_settled`."""
+        self._call(lambda s: s.notify_audio_settled())
+
     def _call(self, factory: Any) -> None:
         if self._session is None or self._loop is None:
             raise VocenceError("Session not started — use `with client.agents.session_sync(...) as sess:`.")
