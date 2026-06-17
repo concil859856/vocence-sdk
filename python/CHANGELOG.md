@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Call history retrieval.** New helper
+  `client.agents.calls(agent_id)` with methods `list()`,
+  `transcript(session_id)`, `recording(session_id, *, download=False)`,
+  and `delete_recording(session_id)`. Mirrors the dashboard's
+  per-agent call view: list recent calls (range/limit-paged),
+  fetch a turn-by-turn transcript with `at_ms` offsets relative to
+  call start, or pull a 1-hour presigned R2 URL for the stereo WAV
+  (left=user mic post-denoise, right=agent TTS, both 16 kHz
+  s16le, one shared timeline). Recordings only exist when the
+  agent's `config.record_enabled = true` for the call. Both
+  sync (`Vocence`) and async (`AsyncVocence`) flavors are exposed.
+- **`AgentConfig` voice-pipeline knobs** now typed on the SDK:
+  `denoise_enabled`, `turn_decider` (`"ultravad" | "fusion"`),
+  `ultravad_threshold` (default 0.50), `min_delay_ms`,
+  `record_enabled`. Pass any of them to `agents.create(...)` or
+  `agents.update(agent_id, ...)`. Existing code that only set the
+  legacy fields is unchanged.
+
+### Changed
+
+- **`agents.create()` / `AsyncAgentsResource.create()`** now accept
+  `first_message`, `denoise_enabled`, `turn_decider`,
+  `ultravad_threshold`, `min_delay_ms`, `record_enabled` as
+  explicit keyword arguments. None of these are required; the
+  server fills in sensible defaults when omitted.
+- **`AgentConfig.ultravad_threshold` default** dropped from `0.55`
+  → `0.50` to match the server's new default. Slightly snappier
+  turn-taking baseline.
+
+### Notes
+
+- The server now sends a new WebSocket message,
+  `{"type": "flush_player"}`, when a `stream_start` / `voice` /
+  `text` turn opens while previous-reply audio is still in the
+  client's playback queue. The current SDK's `AgentSession` /
+  `SyncAgentSession` don't intercept it (audio playback is on
+  the caller's side); custom WebSocket clients should handle it
+  as "flush my local audio buffer, leave the active stream
+  session alone." See API docs §Voice Agent WebSocket → Barge-in
+  protocol for the full semantic.
+
 ## [0.7.0] — 2026-06-11
 
 ### Added

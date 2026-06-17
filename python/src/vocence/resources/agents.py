@@ -39,6 +39,63 @@ class _AgentToolBindings:
         self._http.request("DELETE", f"{self._base}/{tool_id}")  # type: ignore[attr-defined]
 
 
+class _AgentCalls:
+    """Sync helper for ``/v1/agents/{agent_id}/calls/...`` routes.
+
+    Retrieves the history of voice-agent calls + their recordings and
+    transcripts. Recordings are only produced when the agent had
+    ``record_enabled=True`` for the call. The default 30-day retention
+    sweep removes the WAV from object storage but leaves the
+    ``voice_call_logs`` row intact for analytics — once swept,
+    :meth:`recording` raises a 404."""
+
+    def __init__(self, http: object, agent_id: str) -> None:
+        self._http = http
+        self._base = f"/v1/agents/{agent_id}/calls"
+
+    def list(self, *, range: str = "30d", limit: int = 100) -> list[dict]:
+        """Recent calls, newest first. ``range`` accepts ``7d`` /
+        ``30d`` / ``90d`` (max ``365d``). Each entry includes a
+        ``has_recording`` boolean and ``session_id`` you can pass to
+        :meth:`recording` and :meth:`transcript`."""
+        data = self._http.request(  # type: ignore[attr-defined]
+            "GET", self._base, params={"range": range, "limit": limit},
+        )
+        return list(data.get("calls") or [])
+
+    def transcript(self, session_id: str) -> list[dict]:
+        """Per-turn transcript: ``[{role, text, at_ms}, …]`` in
+        chronological order. ``at_ms`` is the offset from the call's
+        ``started_at`` so a player UI can seek to the exact turn.
+        Raises 404 when the call doesn't exist or isn't owned by
+        this API key."""
+        data = self._http.request("GET", f"{self._base}/{session_id}/transcript")  # type: ignore[attr-defined]
+        return list(data.get("turns") or [])
+
+    def recording(self, session_id: str, *, download: bool = False) -> dict:
+        """Return ``{"url": "<presigned R2 URL>", "expires_in": 3600}``
+        for the call's stereo WAV (left=user mic, right=agent TTS,
+        both 16 kHz s16le). Pass ``download=True`` to receive a URL
+        with a ``Content-Disposition: attachment`` header so browsers
+        offer a save dialog instead of inline playback. Raises 404
+        if the recording is gone (agent didn't have record_enabled,
+        or the retention sweep already removed it)."""
+        return self._http.request(  # type: ignore[attr-defined]
+            "GET",
+            f"{self._base}/{session_id}/recording",
+            params={"download": "true"} if download else None,
+        )
+
+    def delete_recording(self, session_id: str) -> dict:
+        """Immediately purge a call's recording. Returns
+        ``{"deleted": true|false}``; ``false`` means the recording
+        was already gone (idempotent). The ``voice_call_logs`` row
+        itself is preserved so aggregate analytics don't shift."""
+        return self._http.request(  # type: ignore[attr-defined]
+            "DELETE", f"{self._base}/{session_id}/recording",
+        )
+
+
 class _AgentRuns:
     """Sync helper for goal-agent runs:
     ``client.agents.runs(agent_id).{list,start,get,cancel}(...)``.
@@ -98,16 +155,27 @@ class AgentsResource(_AgentsBase):
         llm_model: str | None = None,
         temperature: float | None = None,
         enabled_tools: list[str] | None = None,
+        first_message: str | None = None,
         goal: str | None = None,
         success_metric: str | None = None,
         max_iterations: int | None = None,
+        # Voice-pipeline knobs (see Agent.config for descriptions).
+        denoise_enabled: bool | None = None,
+        turn_decider: str | None = None,
+        ultravad_threshold: float | None = None,
+        min_delay_ms: int | None = None,
+        record_enabled: bool | None = None,
     ) -> Agent:
         body = _agent_body(
             name=name, type=type, purpose=purpose, system_prompt=system_prompt,
             knowledge=knowledge, voice=voice, language=language,
             llm_model=llm_model, temperature=temperature,
-            enabled_tools=enabled_tools, goal=goal,
-            success_metric=success_metric, max_iterations=max_iterations,
+            enabled_tools=enabled_tools, first_message=first_message,
+            goal=goal, success_metric=success_metric,
+            max_iterations=max_iterations,
+            denoise_enabled=denoise_enabled, turn_decider=turn_decider,
+            ultravad_threshold=ultravad_threshold, min_delay_ms=min_delay_ms,
+            record_enabled=record_enabled,
         )
         data = self._http.request("POST", self._path, json=body)  # type: ignore[attr-defined]
         return Agent.model_validate(data.get("agent") or data)
@@ -132,6 +200,16 @@ class AgentsResource(_AgentsBase):
     def runs(self, agent_id: str) -> _AgentRuns:
         """Goal-agent run helper: ``client.agents.runs(id).start()``."""
         return _AgentRuns(self._http, agent_id)
+
+    def calls(self, agent_id: str) -> _AgentCalls:
+        """Call history helper:
+        ``client.agents.calls(id).list()``, ``.transcript(sid)``,
+        ``.recording(sid)``, ``.delete_recording(sid)``.
+
+        Recordings are produced only when the agent's
+        ``record_enabled=True`` for the call. Retention is 30 days
+        by default."""
+        return _AgentCalls(self._http, agent_id)
 
     # ----- discovery: templates / models / built-in tools -----
 
@@ -259,6 +337,38 @@ class _AsyncAgentToolBindings:
         await self._http.request("DELETE", f"{self._base}/{tool_id}")  # type: ignore[attr-defined]
 
 
+class _AsyncAgentCalls:
+    """Async sibling of :class:`_AgentCalls`."""
+
+    def __init__(self, http: object, agent_id: str) -> None:
+        self._http = http
+        self._base = f"/v1/agents/{agent_id}/calls"
+
+    async def list(self, *, range: str = "30d", limit: int = 100) -> list[dict]:
+        data = await self._http.request(  # type: ignore[attr-defined]
+            "GET", self._base, params={"range": range, "limit": limit},
+        )
+        return list(data.get("calls") or [])
+
+    async def transcript(self, session_id: str) -> list[dict]:
+        data = await self._http.request(  # type: ignore[attr-defined]
+            "GET", f"{self._base}/{session_id}/transcript",
+        )
+        return list(data.get("turns") or [])
+
+    async def recording(self, session_id: str, *, download: bool = False) -> dict:
+        return await self._http.request(  # type: ignore[attr-defined]
+            "GET",
+            f"{self._base}/{session_id}/recording",
+            params={"download": "true"} if download else None,
+        )
+
+    async def delete_recording(self, session_id: str) -> dict:
+        return await self._http.request(  # type: ignore[attr-defined]
+            "DELETE", f"{self._base}/{session_id}/recording",
+        )
+
+
 class _AsyncAgentRuns:
     """Async sibling of :class:`_AgentRuns`."""
 
@@ -311,16 +421,26 @@ class AsyncAgentsResource(_AgentsBase):
         llm_model: str | None = None,
         temperature: float | None = None,
         enabled_tools: list[str] | None = None,
+        first_message: str | None = None,
         goal: str | None = None,
         success_metric: str | None = None,
         max_iterations: int | None = None,
+        denoise_enabled: bool | None = None,
+        turn_decider: str | None = None,
+        ultravad_threshold: float | None = None,
+        min_delay_ms: int | None = None,
+        record_enabled: bool | None = None,
     ) -> Agent:
         body = _agent_body(
             name=name, type=type, purpose=purpose, system_prompt=system_prompt,
             knowledge=knowledge, voice=voice, language=language,
             llm_model=llm_model, temperature=temperature,
-            enabled_tools=enabled_tools, goal=goal,
-            success_metric=success_metric, max_iterations=max_iterations,
+            enabled_tools=enabled_tools, first_message=first_message,
+            goal=goal, success_metric=success_metric,
+            max_iterations=max_iterations,
+            denoise_enabled=denoise_enabled, turn_decider=turn_decider,
+            ultravad_threshold=ultravad_threshold, min_delay_ms=min_delay_ms,
+            record_enabled=record_enabled,
         )
         data = await self._http.request("POST", self._path, json=body)  # type: ignore[attr-defined]
         return Agent.model_validate(data.get("agent") or data)
@@ -341,6 +461,10 @@ class AsyncAgentsResource(_AgentsBase):
 
     def runs(self, agent_id: str) -> _AsyncAgentRuns:
         return _AsyncAgentRuns(self._http, agent_id)
+
+    def calls(self, agent_id: str) -> _AsyncAgentCalls:
+        """Async sibling of :meth:`AgentsResource.calls`."""
+        return _AsyncAgentCalls(self._http, agent_id)
 
     # ----- discovery -----
 

@@ -22,9 +22,25 @@ class AgentConfig(_Base):
     llm_model: str | None = None
     temperature: float | None = 0.6
     enabled_tools: list[str] | None = None
+    first_message: str | None = None
     goal: str | None = None
     success_metric: str | None = None
     max_iterations: int | None = None
+    # ── Voice-pipeline knobs ─────────────────────────────────────────
+    # Insert DeepFilterNet 3 denoise upstream of STT + UltraVAD.
+    denoise_enabled: bool = False
+    # Primary end-of-turn detector: "ultravad" (default) or "fusion".
+    turn_decider: str = "ultravad"
+    # UltraVAD end-of-turn probability threshold (0.0-1.0). Lower =
+    # snappier turn-taking; higher = more patient. Default 0.50.
+    ultravad_threshold: float = 0.50
+    # Minimum silence (ms) before commit, regardless of model
+    # confidence. None = server default (500 ms).
+    min_delay_ms: int | None = None
+    # Record both legs of every call to a stereo WAV (left=user,
+    # right=agent). Required for the call-history endpoints to return
+    # any audio. Off by default.
+    record_enabled: bool = False
 
 
 class Agent(_Base):
