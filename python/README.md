@@ -118,6 +118,23 @@ on the mic gate — barge-in still works, it just feels a bit looser.
 Same contract on the sync `Vocence` client: `sess.notify_audio_started()`
 and `sess.notify_audio_settled()` are blocking calls.
 
+## Building your own pipeline? See `vocence-plugins`
+
+This SDK talks to a Vocence-hosted voice agent — the agent owns its
+STT, LLM, TTS, knowledge base, tool dispatch, and call history. If
+you instead run your own real-time voice-agent pipeline and just
+want Vocence voices + recognition as components,
+[`vocence-plugins`](https://pypi.org/project/vocence-plugins/) ships
+drop-in `VocenceTTS` and `VocenceSTT` classes that conform to the
+standard streaming TTS / STT abstract interfaces.
+
+| Use case | Use |
+|---|---|
+| Talk to a Vocence-hosted voice agent | `vocence` (this package) |
+| Build your own agent pipeline with Vocence voices + recognition | [`vocence-plugins`](https://pypi.org/project/vocence-plugins/) |
+
+Same `voc_live_…` key for both. They don't overlap.
+
 ## CLI
 
 ```bash
