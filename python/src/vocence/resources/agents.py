@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from .._streaming import AgentSession
     from .._streaming_sync import SyncAgentSession
     from ..conversation import Conversation
+    from .embed_tokens import AsyncEmbedTokensResource, EmbedTokensResource
+    from .knowledge import AsyncKnowledgeResource, KnowledgeResource
 
 
 class _AgentsBase:
@@ -282,12 +284,12 @@ class AgentsResource(_AgentsBase):
             "POST", "/v1/agents/architect/chat", json=body,
         )
 
-    def knowledge(self, agent_id: str) -> "KnowledgeResource":
+    def knowledge(self, agent_id: str) -> KnowledgeResource:
         """Knowledge-ingest helper: ``client.agents.knowledge(id).ingest_url(...)``."""
         from .knowledge import KnowledgeResource
         return KnowledgeResource(self._http, agent_id)
 
-    def embed_tokens(self, agent_id: str) -> "EmbedTokensResource":
+    def embed_tokens(self, agent_id: str) -> EmbedTokensResource:
         """Embed-token helper: ``client.agents.embed_tokens(id).create(...)``."""
         from .embed_tokens import EmbedTokensResource
         return EmbedTokensResource(self._http, agent_id)
@@ -518,12 +520,12 @@ class AsyncAgentsResource(_AgentsBase):
             "POST", "/v1/agents/architect/chat", json=body,
         )
 
-    def knowledge(self, agent_id: str) -> "AsyncKnowledgeResource":
+    def knowledge(self, agent_id: str) -> AsyncKnowledgeResource:
         """Async knowledge-ingest helper: ``await client.agents.knowledge(id).ingest_url(...)``."""
         from .knowledge import AsyncKnowledgeResource
         return AsyncKnowledgeResource(self._http, agent_id)
 
-    def embed_tokens(self, agent_id: str) -> "AsyncEmbedTokensResource":
+    def embed_tokens(self, agent_id: str) -> AsyncEmbedTokensResource:
         """Async embed-token helper: ``await client.agents.embed_tokens(id).create(...)``."""
         from .embed_tokens import AsyncEmbedTokensResource
         return AsyncEmbedTokensResource(self._http, agent_id)

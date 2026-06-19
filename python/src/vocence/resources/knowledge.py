@@ -19,14 +19,13 @@ poll :meth:`job` until ``status`` is ``done`` or ``failed``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import IO, Any, Union
+from typing import IO, Any
 from urllib.parse import urlparse
-
 
 # A PDF upload can be either a filesystem path or an already-opened
 # file-like object. The async / sync resources resolve both into raw
 # bytes before they reach the HTTP layer.
-PdfInput = Union[str, Path, bytes, IO[bytes]]
+PdfInput = str | Path | bytes | IO[bytes]
 
 
 def _check_public_http_url(url: str) -> None:

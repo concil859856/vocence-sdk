@@ -14,7 +14,6 @@ from vocence import AsyncVocence, Vocence
 
 from .conftest import API_KEY, BASE_URL
 
-
 # --------------------------------------------------------------------- sync
 
 

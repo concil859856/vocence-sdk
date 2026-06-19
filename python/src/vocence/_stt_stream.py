@@ -29,8 +29,9 @@ the context) — the server flushes a final transcript and closes.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 import websockets
 from websockets.exceptions import ConnectionClosed
@@ -83,7 +84,7 @@ class SttStreamSession:
         self._ws: websockets.WebSocketClientProtocol | None = None
         self._started = False
 
-    async def __aenter__(self) -> "SttStreamSession":
+    async def __aenter__(self) -> SttStreamSession:
         try:
             self._ws = await websockets.connect(
                 self._url,

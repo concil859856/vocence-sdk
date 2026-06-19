@@ -30,8 +30,9 @@ a fresh meta/audio/end sequence.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 import websockets
 from websockets.exceptions import ConnectionClosed
@@ -71,7 +72,7 @@ class TtsStreamSession:
         self._api_key = key
         self._ws: websockets.WebSocketClientProtocol | None = None
 
-    async def __aenter__(self) -> "TtsStreamSession":
+    async def __aenter__(self) -> TtsStreamSession:
         try:
             self._ws = await websockets.connect(
                 self._url,

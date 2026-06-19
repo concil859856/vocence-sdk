@@ -83,7 +83,7 @@ class TtsResource(_TtsBase):
         self._base_url = base_url or ""
         self._api_key = api_key or ""
 
-    def stream(self, voice_id: int) -> "TtsStreamSession":
+    def stream(self, voice_id: int) -> TtsStreamSession:
         """Open a streaming-TTS WebSocket bound to a pre-registered voice.
 
         Returns an async context manager. Inside it, call :meth:`speak`
@@ -151,7 +151,7 @@ class AsyncTtsResource(_TtsBase):
         self._base_url = base_url or ""
         self._api_key = api_key or ""
 
-    def stream(self, voice_id: int) -> "TtsStreamSession":
+    def stream(self, voice_id: int) -> TtsStreamSession:
         """Async-side identical to :meth:`TtsResource.stream`. Note
         that ``TtsStreamSession`` is the same class on both sides —
         it's natively async and the sync client wraps it the same

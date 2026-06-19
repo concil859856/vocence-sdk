@@ -70,7 +70,7 @@ class SttResource(_SttBase):
         encoding: str = "pcm_s16le",
         enable_partials: bool = True,
         vad_events: bool = False,
-    ) -> "SttStreamSession":
+    ) -> SttStreamSession:
         """Open a streaming-STT WebSocket. Returns an async context
         manager — see :mod:`vocence._stt_stream` for usage.
 
@@ -138,7 +138,7 @@ class AsyncSttResource(_SttBase):
         encoding: str = "pcm_s16le",
         enable_partials: bool = True,
         vad_events: bool = False,
-    ) -> "SttStreamSession":
+    ) -> SttStreamSession:
         from .._stt_stream import SttStreamSession
 
         return SttStreamSession(

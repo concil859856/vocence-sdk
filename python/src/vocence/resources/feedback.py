@@ -33,7 +33,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 # Kept in sync with developer-api/app/api/routes/feedback.py. The
 # server validates as well; this is a local guard so the SDK fails
 # fast with a clear error instead of a 400 round-trip.
