@@ -1,7 +1,12 @@
 """`vocence design` — design a voice from a written description.
 
-Wraps preview + save: generates two TTS variants, plays both (if
-``vocence[audio]`` is installed), asks which to keep, persists it.
+Wraps preview + save: generates a single deterministic preview
+(the "original" variant — the API surfaces only one for
+predictable behavior), plays it if ``vocence[audio]`` is installed,
+and persists it. The ``--variant`` flag still accepts "revised"
+because the underlying save endpoint supports both, but no
+revised preview audio is available before save — picking "revised"
+is a blind commit to the LLM-polished prompt.
 """
 
 from __future__ import annotations
@@ -41,21 +46,23 @@ def design(
     display_name = (name or description).strip()[:40] or "designed-voice"
 
     with get_client() as client:
-        typer.echo("generating previews…")
+        typer.echo("generating preview…")
         preview = client.voice_design.preview(voice_description=description)
-        typer.echo("\n  sample script: " + preview.sample_script)
-        typer.echo(f"  variant A (original): {preview.audio_a_url}")
-        typer.echo(f"  variant B (revised) : {preview.audio_b_url}")
+        typer.echo(f"  audio: {preview.audio_url}")
+        if preview.revised_instruction:
+            typer.echo(f"  revised instruction: {preview.revised_instruction}")
+        if preview.credits_remaining is not None:
+            typer.echo(f"  credits used: {preview.credits_used}  ·  remaining: {preview.credits_remaining}")
 
-        # Play both if we can.
-        chosen = (auto or "").strip().lower()
+        # Default to "original" — only that variant has audio you can
+        # preview. The save endpoint accepts "revised" too but you'd
+        # be committing to audio you haven't heard.
+        chosen = (auto or "").strip().lower() or "original"
         if chosen not in {"original", "revised"}:
-            _try_play(preview.audio_a_url, label="variant A (original)")
-            _try_play(preview.audio_b_url, label="variant B (revised)")
-            chosen = typer.prompt("which variant?", default="revised").strip().lower()
-            if chosen not in {"original", "revised"}:
-                typer.secho(f"unknown variant: {chosen}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(code=1)
+            typer.secho(f"unknown variant: {chosen}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+        if not auto:
+            _try_play(preview.audio_url, label="preview")
 
         saved = client.voice_design.save(
             preview_token=preview.preview_token,
