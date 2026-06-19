@@ -135,6 +135,27 @@ standard streaming TTS / STT abstract interfaces.
 
 Same `voc_live_…` key for both. They don't overlap.
 
+```bash
+pip install vocence-plugins
+```
+
+```python
+from vocence_plugins import VocenceTTS, VocenceSTT
+
+tts = VocenceTTS(voice="design-aria", language="English")
+stt = VocenceSTT(language="English")
+
+# In your pipeline loop:
+async for frame in capture_mic_at_16k_mono_pcm16le():
+    await stt.process_audio(frame)        # mic in → transcripts via callback
+
+await tts.synthesize("Hello from your own pipeline!")  # text in → 24 kHz PCM out
+await tts.interrupt()                                  # cancel on user barge-in
+```
+
+Full worked example with the transcript callback and barge-in handling is in
+the [`vocence-plugins` README](https://github.com/concil859856/vocence-agents-plugins#using-the-plug-ins-to-build-a-voice-agent).
+
 ## CLI
 
 ```bash
