@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-19
+
 ### Added
 
 - **Call history retrieval.** New helper
@@ -37,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AgentConfig.ultravad_threshold` default** dropped from `0.55`
   → `0.50` to match the server's new default. Slightly snappier
   turn-taking baseline.
+- **README cross-reference to `vocence-plugins`** — sibling package
+  for developers running their own real-time voice-agent pipeline
+  who want Vocence voices + recognition as drop-in components.
+  Same `voc_live_…` key, no functional overlap with this SDK; see
+  the "Building your own pipeline?" section.
 
 ### Notes
 
