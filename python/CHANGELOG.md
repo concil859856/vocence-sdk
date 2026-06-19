@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-19
+
+### Fixed
+
+- **`AsyncVocence().tts.estimate(...)` is now awaitable.** The
+  inherited `staticmethod` made the async-client call return a
+  bare dataclass while the IDE / type checker said it was a
+  coroutine — `await` raised `TypeError: object Estimate can't be
+  used in 'await' expression`. The async client now exposes its
+  own `async def estimate(...)` that wraps the same pure-local
+  arithmetic, so `await client.tts.estimate(...)` works without
+  surprise. The sync `Vocence().tts.estimate(...)` stays sync.
+- **`voice_design.preview()` response model.** Schema rewritten
+  to match what `/v1/voice/design/preview` actually returns. Old
+  fields removed (`sample_script`, `audio_a_url`, `audio_b_url`,
+  `expires_at`, `credits`); new fields are `audio_url` (single
+  variant — the API surfaces only the deterministic "original"
+  variant by design), plus `credits_used` and `credits_remaining`.
+  Existing code that read those old fields will need to switch to
+  `audio_url`. The two-variant A/B preview remains a website-UI
+  feature only.
+
 ## [0.7.1] - 2026-06-19
 
 ### Added

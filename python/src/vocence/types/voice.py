@@ -37,20 +37,20 @@ class SavedVoice(_Base):
 class VoiceDesignPreview(_Base):
     """Response from ``POST /v1/voice/design/preview``.
 
-    Two TTS variants are generated from the same description:
+    The pipeline generates two TTS variants internally (one matching the
+    prompt verbatim, one with an LLM-polished version) but the public
+    API surfaces only the **original** variant for deterministic
+    behavior — the same description yields the same audio across calls.
+    Website users see both variants for A/B testing; API consumers get
+    a single result.
 
-    - ``audio_a_url`` — *original* (your prompt verbatim).
-    - ``audio_b_url`` — *revised* (LLM-polished version of your prompt).
-
-    Pass ``preview_token`` plus the chosen variant to
-    ``POST /v1/voice/design/save`` to persist the winner.
+    Pass ``preview_token`` to ``POST /v1/voice/design/save`` to persist
+    this voice for re-use.
     """
 
     preview_token: str
-    sample_script: str
+    audio_url: str
     voice_description: str
     revised_instruction: str | None = None
-    audio_a_url: str
-    audio_b_url: str
-    expires_at: str | None = None
-    credits: int | None = None
+    credits_used: int | None = None
+    credits_remaining: int | None = None

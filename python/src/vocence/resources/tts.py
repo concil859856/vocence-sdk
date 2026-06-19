@@ -187,3 +187,21 @@ class AsyncTtsResource(_TtsBase):
             timeout=timeout,
         )
         return TtsResponse.model_validate(data)
+
+    # Override the inherited sync ``estimate`` with an async wrapper so
+    # ``AsyncVocence`` callers can ``await client.tts.estimate(...)``
+    # symmetrically with the rest of the async surface. The body is
+    # still pure-local arithmetic — no I/O — but typing it async
+    # avoids the silent "I awaited a non-awaitable" TypeError users
+    # otherwise hit when they uniformly await every method on the
+    # async client.
+    async def estimate(  # type: ignore[override]
+        self,
+        *,
+        text: str,
+        voice: str | None = None,
+        style_instruction: str | None = None,
+    ) -> Estimate:
+        return _TtsBase.estimate(
+            text=text, voice=voice, style_instruction=style_instruction
+        )

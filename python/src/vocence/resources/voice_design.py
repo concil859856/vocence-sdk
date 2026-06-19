@@ -1,7 +1,8 @@
 """Voice-design endpoints — generate previews from a written description and
-persist the chosen variant. The server's LLM picks a sample script and
-synthesizes both an *original* and an LLM-*revised* variant; the caller picks
-the one that sounds best and saves it."""
+persist the chosen variant. The pipeline generates two TTS variants
+internally (original / LLM-revised) but the public API surfaces only the
+*original* variant for deterministic API behavior. Pass the returned
+``preview_token`` to :meth:`save` to persist the voice for re-use."""
 
 from __future__ import annotations
 
@@ -20,8 +21,8 @@ class VoiceDesignResource(_VoiceDesignBase):
         self._http = http
 
     def preview(self, *, voice_description: str) -> VoiceDesignPreview:
-        """Generate two TTS preview variants from a free-form voice
-        description. Returns a ``preview_token`` plus the two audio URLs."""
+        """Generate a TTS preview from a free-form voice description.
+        Returns a ``preview_token`` + single ``audio_url``."""
         data = self._http.request(  # type: ignore[attr-defined]
             "POST",
             self._preview_path,
